@@ -1,0 +1,21 @@
+{
+  "name": "معمل الرسم الفني — مركز تدريب ترسانة الإسكندرية",
+  "short_name": "معمل الرسم",
+  "description": "تطبيق تعليمي للرسم الفني الصناعي: لوحة رسم بالأدوات، ورقة مربعات بتطبيق موجّه، ومعمل افتراضي للمجسمات والمساقط.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#081226",
+  "theme_color": "#081226",
+  "categories": ["education"],
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "assets/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
