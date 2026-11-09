@@ -1,5 +1,5 @@
 /* معمل الرسم الفني — offline cache (Designed & Developed by Mohamed-Eldawly) */
-var CACHE = 'dl-v2';
+var CACHE = 'dl-v3';
 var FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/sfx.js', 'js/dl-geo.js', 'js/lessons.js', 'js/board.js', 'js/lab.js', 'js/app.js',

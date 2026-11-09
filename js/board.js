@@ -161,12 +161,13 @@
       var Lc = C.compL, u = [Math.cos(cp.ang), Math.sin(cp.ang)], n = cp.flip ? [-u[1], u[0]] : [u[1], -u[0]], c = [cp.cx, cp.cy], P = [cp.cx + cp.r * u[0], cp.cy + cp.r * u[1]];
       var h = Math.sqrt(Math.max(0, Lc * Lc - cp.r * cp.r / 4)), H = [(c[0] + P[0]) / 2 + n[0] * h, (c[1] + P[1]) / 2 + n[1] * h];
       var lab = [H[0] + n[0] * 110, H[1] + n[1] * 110];
-      return { c: c, P: P, H: H, ax: n, G: [H[0] + n[0] * 52, H[1] + n[1] * 52], Kn: [H[0] + (P[0] - H[0]) * 0.5, H[1] + (P[1] - H[1]) * 0.5], lab: lab, F: [lab[0] + 86, lab[1]] };
+      return { c: c, P: P, H: H, ax: n, G: [H[0] + n[0] * 52, H[1] + n[1] * 52], Kn: [H[0] + (P[0] - H[0]) * 0.5, H[1] + (P[1] - H[1]) * 0.5], lab: lab, F: [lab[0] + 86, lab[1]], F2: [lab[0] - 86, lab[1]] };
     }
     function maxR() { return C.compL * 1.9; }
     function compassHit(p) {
       var g = cgeo(s.comp);
       if (dist(p, g.F) < 22) return 'flip';
+      if (dist(p, g.F2) < 22) return 'mirror';
       if (dist(p, g.P) < 26) return 'draw';
       if (dist(p, g.Kn) < 20) return 'open';
       if (dist(p, g.G) < 38 || dist(p, [g.H[0] + g.ax[0] * 26, g.H[1] + g.ax[1] * 26]) < 22) return 'rot';
@@ -260,7 +261,13 @@
       if (s.tool === 'compass' && s.comp && s.comp.r >= 4 && s.comp.stage !== 'draw') {
         var ch = compassHit(p), cg = cgeo(s.comp);
         if (ch === 'draw') { var an0 = Math.atan2(p[1] - s.comp.cy, p[0] - s.comp.cx); drag = { k: 'cdraw', last: an0, a0: s.comp.ang, sw: 0, lp: p }; set({ comp: Object.assign({}, s.comp, { stage: 'draw', a0: s.comp.ang, sw: 0 }) }); return; }
-        if (ch === 'flip') { sfx.clack(); sfx.swoosh(0.8, 0.2); set({ comp: Object.assign({}, s.comp, { flip: !s.comp.flip }) }); toast(s.comp.flip ? 'الفرجار مقلوب للجهة الأخرى' : 'الفرجار في وضعه الطبيعي', 'info'); return; }
+        if (ch === 'flip' || ch === 'mirror') {
+          // flip = mirror up/down (hinge to the other side), mirror = left/right (lead swaps to the other side of the needle)
+          var cm = s.comp, na = ch === 'mirror' ? Math.PI - cm.ang : -cm.ang;
+          sfx.clack(); sfx.swoosh(0.8, 0.2);
+          set({ comp: Object.assign({}, cm, { ang: Math.atan2(Math.sin(na), Math.cos(na)), flip: !cm.flip }) });
+          toast(ch === 'mirror' ? 'قلب الفرجار يمين / شمال' : 'قلب الفرجار فوق / تحت', 'info'); return;
+        }
         if (ch === 'open') { drag = { k: 'copen2', r0: s.comp.r, d0: dist(p, cg.c), lp: p }; sfx.tick(1400, 0.12); return; }
         if (ch === 'rot') { drag = { k: 'crot', last: Math.atan2(p[1] - s.comp.cy, p[0] - s.comp.cx), lp: p }; sfx.tick(1100, 0.1); return; }
         if (ch === 'move') { drag = { k: 'cmove', off: [p[0] - s.comp.cx, p[1] - s.comp.cy], lp: p }; sfx.tick(1000, 0.1); return; }
@@ -451,7 +458,8 @@
         '<circle cx="' + fx(g.Kn[0]) + '" cy="' + fx(g.Kn[1]) + '" r="9" fill="url(#screw)" stroke="' + (act ? '#F2C94C' : '#5E697C') + '" stroke-width="' + (act ? 2.5 : 1) + '"/></g>' +
         (act ? '<circle cx="' + fx(P[0]) + '" cy="' + fx(P[1]) + '" r="15" fill="rgba(227,20,27,.12)" stroke="#E3141B" stroke-width="2" stroke-dasharray="5 4"/>' : '') +
         '<g class="mono" pointer-events="none"><rect x="' + fx(lab[0] - 59) + '" y="' + fx(lab[1] - 15) + '" width="118" height="30" rx="9" fill="#0A1630" fill-opacity=".92"/><text x="' + fx(lab[0]) + '" y="' + fx(lab[1] + 6) + '" text-anchor="middle" fill="#FFFFFF" font-size="14" font-weight="600">R = ' + mm + ' mm</text></g>' +
-        (act ? '<g transform="translate(' + fx(F[0]) + ' ' + fx(F[1]) + ')"><circle r="19" fill="#FFFFFF" fill-opacity=".95" stroke="#2F7BEF" stroke-width="2"/><path d="M-9 -4H8l-4 -4M9 4H-8l4 4" fill="none" stroke="#1B4FA8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><title>اقلب الفرجار يمين / شمال</title></g>' : '');
+        (act ? '<g transform="translate(' + fx(F[0]) + ' ' + fx(F[1]) + ')"><circle r="19" fill="#FFFFFF" fill-opacity=".95" stroke="#2F7BEF" stroke-width="2"/><path d="M-4 -9V8l-4 -4M4 9V-8l4 4" fill="none" stroke="#1B4FA8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><title>اقلب الفرجار فوق / تحت</title></g>' +
+          '<g transform="translate(' + fx(g.F2[0]) + ' ' + fx(g.F2[1]) + ')"><circle r="19" fill="#FFFFFF" fill-opacity=".95" stroke="#E07B00" stroke-width="2"/><path d="M-9 -4H8l-4 -4M9 4H-8l4 4" fill="none" stroke="#B35F00" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><title>اقلب الفرجار يمين / شمال</title></g>' : '');
     }
     function triSvg(id) {
       var P = pose(id), T = s[id], w = P.w, h = P.h, ins = id === 't45' ? 26 : 24;
