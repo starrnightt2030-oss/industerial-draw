@@ -56,7 +56,7 @@
     compass: 'M16 3v5M16 8l-7 20M16 8l7 20M11 17h10', dim: 'M4 12v10M28 12v10M4 17h24M4 17l4-3M4 17l4 3M28 17l-4-3M28 17l-4 3',
     text: 'M7 8V5h18v3M16 5v22M11 27h10', eraser: 'M6 20l10-12 10 8-8 10H12zM12 26h14',
     ruler: 'M3 22L22 3l7 7-19 19zM8 17l2 2M12 13l2 2M16 9l2 2', t45: 'M6 26V6l20 20zM10 22v-6l6 6z', t3060: 'M6 26V4l22 22zM10 22V14l8 8z',
-    flip: 'M16 4v24M12 8L4 24h8zM20 8l8 16h-8z', orient: 'M26 16a10 10 0 1 1-3-7M26 4v6h-6', combine: 'M4 26V10l16 16zM14 26l12-12v12z',
+    flip: 'M16 4v24M12 8L4 24h8zM20 8l8 16h-8z', orient: 'M26 16a10 10 0 1 1-3-7M26 4v6h-6', combine: 'M4 26V10l16 16zM14 26l12-12v12z', free: 'M16 3v26M3 16h26M16 3l-4 4M16 3l4 4M16 29l-4-4M16 29l4-4M3 16l4-4M3 16l4 4M29 16l-4-4M29 16l-4 4',
     prot: 'M4 24a12 12 0 0124 0zM16 24l6-8M16 24V14', tape: 'M16 9a7 7 0 100 14 7 7 0 000-14zM16 13a3 3 0 100 6 3 3 0 000-6zM23 16h6'
   };
   var HANDLE = '<circle r="15" fill="#FFFFFF" fill-opacity=".92" stroke="#2F7BEF" stroke-width="2"/><path d="M-6 -2a6 6 0 1 1 1 6" fill="none" stroke="#2F7BEF" stroke-width="2" stroke-linecap="round"/>';
@@ -120,7 +120,7 @@
       var ids = ['t3060', 't45'];
       for (var i = 0; i < ids.length; i++) {
         var id = ids[i]; if (!s[id].show) continue; var P = pose(id), v = verts(P);
-        if (grid && dist(p, wpt(P, [30, -30])) < 22) return { k: 'rot', id: id };
+        if ((grid || s[id].mode === 'free') && dist(p, wpt(P, [30, -30])) < 24) return { k: 'rot', id: id };
         if (inPoly(p, v)) return { k: 'tri', id: id };
       }
       if (grid && s.ru.show) { var R = pose('ru'); if (dist(p, wpt(R, [R.w - 34, R.h / 2])) < 22) return { k: 'rot', id: 'ru' }; if (inPoly(p, rulerPoly(R))) return { k: 'ru' }; }
@@ -176,6 +176,39 @@
     }
     function anim(ms, frame, done) { var t0 = performance.now(); function step(t) { if (!alive) return; var k = Math.min(1, (t - t0) / ms); frame(k); if (k < 1) raf = requestAnimationFrame(step); else if (done) done(); } raf = requestAnimationFrame(step); }
 
+    /* free triangles: edge-to-edge snapping so they can be combined in any arrangement */
+    function snapTri(id) {
+      var T = s[id], v = verts(pose(id)), mine = [[v[0], v[1]], [v[1], v[2]], [v[2], v[0]]], tgt = [];
+      var other = id === 't45' ? 't3060' : 't45';
+      if (s[other].show) { var w = verts(pose(other)); tgt.push([w[0], w[1]], [w[1], w[2]], [w[2], w[0]]); }
+      if (!grid) { tgt.push([[64, s.tY], [1344, s.tY]], [[64, s.tY + 46], [1344, s.tY + 46]]); }
+      if (grid && s.ru.show) { var R = rulerPoly(pose('ru')); tgt.push([R[0], R[1]], [R[3], R[2]]); }
+      var best = null;
+      mine.forEach(function (e1, i1) {
+        var a1 = Math.atan2(e1[1][1] - e1[0][1], e1[1][0] - e1[0][0]), m1 = [(e1[0][0] + e1[1][0]) / 2, (e1[0][1] + e1[1][1]) / 2];
+        tgt.forEach(function (e2) {
+          var a2 = Math.atan2(e2[1][1] - e2[0][1], e2[1][0] - e2[0][0]), da = wrapA(a2 - a1);
+          if (da > Math.PI / 2) da -= Math.PI; if (da < -Math.PI / 2) da += Math.PI;
+          if (Math.abs(da) > 6 * Math.PI / 180) return;
+          var L2 = dist(e2[0], e2[1]), u = [(e2[1][0] - e2[0][0]) / L2, (e2[1][1] - e2[0][1]) / L2], n = [-u[1], u[0]];
+          var pd = (m1[0] - e2[0][0]) * n[0] + (m1[1] - e2[0][1]) * n[1]; if (Math.abs(pd) > 18) return;
+          var t0 = (e1[0][0] - e2[0][0]) * u[0] + (e1[0][1] - e2[0][1]) * u[1], t1 = (e1[1][0] - e2[0][0]) * u[0] + (e1[1][1] - e2[0][1]) * u[1];
+          if (Math.min(Math.max(t0, t1), L2) - Math.max(Math.min(t0, t1), 0) < 12) return;
+          var sc = Math.abs(pd) + Math.abs(da) * 60; if (!best || sc < best.sc) best = { sc: sc, i1: i1, e2: e2, da: da };
+        });
+      });
+      if (!best) return;
+      // 1) rotate about the triangle's own pivot so the edges are parallel
+      var c0 = pivot(id), prev = s[id], nr = prev.rot + best.da * 180 / Math.PI; s[id] = Object.assign({}, prev, { rot: nr }); var c1 = pivot(id);
+      s[id] = Object.assign({}, s[id], { x: prev.x + c0[0] - c1[0], y: prev.y + c0[1] - c1[1] });
+      // 2) slide perpendicular so the edges touch, then snap corners together if close
+      var v2 = verts(pose(id)), E = [[v2[0], v2[1]], [v2[1], v2[2]], [v2[2], v2[0]]][best.i1], e2 = best.e2, L2 = dist(e2[0], e2[1]), u = [(e2[1][0] - e2[0][0]) / L2, (e2[1][1] - e2[0][1]) / L2], n = [-u[1], u[0]];
+      var mid = [(E[0][0] + E[1][0]) / 2, (E[0][1] + E[1][1]) / 2], pd = (mid[0] - e2[0][0]) * n[0] + (mid[1] - e2[0][1]) * n[1], dx = -n[0] * pd, dy = -n[1] * pd, sl = 0, bd = 16;
+      E.forEach(function (q) { var tq = (q[0] + dx - e2[0][0]) * u[0] + (q[1] + dy - e2[0][1]) * u[1]; [0, L2].forEach(function (te) { if (Math.abs(te - tq) < bd) { bd = Math.abs(te - tq); sl = te - tq; } }); });
+      dx += u[0] * sl; dy += u[1] * sl;
+      s[id] = Object.assign({}, s[id], { x: s[id].x + dx, y: s[id].y + dy });
+      sfx.thud(0.25); sfx.clack(); set({}); toast('تم التركيب حافة على حافة · الزاوية ' + (((Math.round(nr) % 360) + 360) % 360) + '°', 'ok');
+    }
     /* ---------- demo (teacher shows the steps) ---------- */
     function runDemo(steps) {
       if (s.demo) return; demoStop = false; set({ demo: true, tool: 'pencil', showHint: false });
@@ -273,6 +306,7 @@
         if (ch === 'move') { drag = { k: 'cmove', off: [p[0] - s.comp.cx, p[1] - s.comp.cy], lp: p }; sfx.tick(1000, 0.1); return; }
       }
       var hit = hitTool(p);
+      if (hit && hit.k === 'rot') { drag = { k: 'rot', id: hit.id, c: pivot(hit.id), a0: 0, r0: pose(hit.id).rot }; drag.a0 = Math.atan2(p[1] - drag.c[1], p[0] - drag.c[0]); if (hit.id !== 'ru' && hit.id !== 'pr') set({ sel: hit.id }); return; }
       if (hit && hit.k === 'tsq' && (p[0] <= 64 || s.tool !== 'pencil')) { drag = { k: 'tsq', off: p[1] - s.tY, ly: p[1] }; return; }
       if (s.tool === 'pencil') {
         if (!s.taped && !grid) { sfx.err(); toast('ثبّت الورقة بالشريط اللاصق أولًا', 'err'); return; }
@@ -345,7 +379,7 @@
     }
     function up() {
       var d = drag; drag = null; if (!d) return;
-      if (d.k === 'tsq' || d.k === 'tri' || d.k === 'ru' || d.k === 'pr' || d.k === 'rot') { sfx.clack(); set({ chip: null }); return; }
+      if (d.k === 'tsq' || d.k === 'tri' || d.k === 'ru' || d.k === 'pr' || d.k === 'rot') { sfx.clack(); set({ chip: null }); if ((d.id === 't45' || d.id === 't3060') && s[d.id].mode === 'free') snapTri(d.id); return; }
       if (d.k === 'hand') { var pts = s.freeDraft || []; set({ freeDraft: null }); if (pts.length > 1) commit(s.strokes.concat([{ k: 'free', pts: pts.map(function (q) { return [fx(q[0]), fx(q[1])]; }), pc: s.pencil, ink: s.ink }])); return; }
       if (d.k === 'draw' || d.k === 'free') {
         var dr = s.draft; set({ draft: null, chip: null }); if (!dr || dist(dr.a, dr.b) < 4) return;
@@ -471,7 +505,7 @@
         '<path d="M0 0L' + w + ' 0L0 ' + (-h) + 'Z' + inner + '" fill="' + (id === 't45' ? 'url(#acr)' : 'url(#acrG)') + '" fill-rule="evenodd" stroke="' + (id === 't45' ? '#D2E5FF' : '#C9F5E2') + '" stroke-width="1.4" stroke-linejoin="round"/>' +
         '<path d="M3 -3L' + fx(w - 8) + ' -3M3 -3L3 ' + fx(-h + 8) + '" fill="none" stroke="#FFFFFF" stroke-opacity=".55" stroke-width="1"/>' +
         '<rect x="2" y="-20" width="' + fx(w * 0.7) + '" height="20" fill="url(#mmB)"/><rect x="0" y="' + fx(-h * 0.72) + '" width="9" height="' + fx(h * 0.7) + '" fill="url(#mmV)"/><rect x="0" y="' + fx(-h * 0.72) + '" width="14" height="' + fx(h * 0.7) + '" fill="url(#cmV)"/>' +
-        lbl(w - 64, -12, angs[0]) + lbl(18, -h + 70, angs[1]) + lbl(44, -32, '90°') + (grid ? '<g transform="translate(30 -30)">' + HANDLE + '</g>' : '') + '</g>';
+        lbl(w - 64, -12, angs[0]) + lbl(18, -h + 70, angs[1]) + lbl(44, -32, '90°') + (grid || T.mode === 'free' ? '<g transform="translate(30 -30)">' + HANDLE + '</g>' : '') + '</g>';
     }
     function rulerSvg() {
       var P = pose('ru'), nums = ''; for (var i = 0; i <= 20; i++) nums += '<text x="' + fx(20 + i * 10 * K + 0.5) + '" y="28" text-anchor="middle" class="mono" font-size="12" fill="#3D2E00">' + i + '</text>';
@@ -539,7 +573,7 @@
       function tog(id, label, icon, on) { return '<button type="button" class="rbtn tog' + (on ? ' on' : '') + '" data-tog="' + id + '" aria-pressed="' + !!on + '" aria-label="' + label + '"><svg viewBox="0 0 32 32"><path d="' + icon + '"/></svg><span>' + label + '</span></button>'; }
       if (grid) h += tog('ru', 'المسطرة', ICON.ruler, s.ru.show);
       h += tog('t45', 'مثلث 45°', ICON.t45, s.t45.show) + tog('t3060', 'مثلث 30/60°', ICON.t3060, s.t3060.show) + tog('flip', 'قلب المثلث', ICON.flip, false) + tog('orient', s.t3060.orient === '30' ? 'تدوير 30/60' : 'تدوير 60/30', ICON.orient, false);
-      if (!grid) h += tog('combine', 'تركيب المثلثين', ICON.combine, s.t3060.mode === 'on45');
+      if (!grid) h += tog('free', 'تحريك ولفّ حر', ICON.free, s.t45.mode === 'free' || s.t3060.mode === 'free') + tog('combine', 'تركيب ثابت', ICON.combine, s.t3060.mode === 'on45');
       h += tog('pr', 'المنقلة', ICON.prot, s.pr.show);
       if (!grid) h += tog('tape', 'الشريط اللاصق', ICON.tape, s.taped);
       setL2('bd-rail', h);
@@ -609,7 +643,12 @@
         if (a === 'ru') { sfx.clack(); o.ru = Object.assign({}, s.ru, { show: !s.ru.show }); }
         else if (a === 't45' || a === 't3060') { sfx.clack(); o[a] = Object.assign({}, s[a], { show: !s[a].show }); o.sel = a; }
         else if (a === 'flip') { var id = s.sel === 't3060' ? 't3060' : 't45'; sfx.tick(1100, 0.12); o[id] = Object.assign({}, s[id], { flip: !s[id].flip }); }
-        else if (a === 'orient') { sfx.tick(1100, 0.12); o.t3060 = Object.assign({}, s.t3060, { orient: s.t3060.orient === '30' ? '60' : '30', mode: s.t3060.mode === 'on45' ? (grid ? 'free' : 'blade') : s.t3060.mode }); }
+        else if (a === 'orient') { sfx.tick(1100, 0.12); o.t3060 = Object.assign({}, s.t3060, { orient: s.t3060.orient === '30' ? '60' : '30', mode: s.t3060.mode === 'on45' ? (grid || s.t45.mode === 'free' ? 'free' : 'blade') : s.t3060.mode }); }
+        else if (a === 'free') {
+          var goFree = !(s.t45.mode === 'free' || s.t3060.mode === 'free');
+          ['t45', 't3060'].forEach(function (id) { var P0 = pose(id); o[id] = Object.assign({}, s[id], goFree ? { mode: 'free', x: P0.x, y: P0.y, rot: P0.rot, flip: P0.sx < 0, show: true } : { mode: 'blade', x: Math.max(120, Math.min(1100, P0.x)), rot: 0 }); });
+          sfx.clack(); toast(goFree ? 'المثلثان حرّان: اسحب لتحريك، المقبض الأزرق للّف، وقرّب حافة من حافة ليركبا على بعض' : 'المثلثان على مسطرة T', 'info');
+        }
         else if (a === 'combine') { sfx.clack(); var on45 = s.t3060.mode !== 'on45'; o.t3060 = Object.assign({}, s.t3060, { mode: on45 ? 'on45' : 'blade', orient: on45 ? '60' : s.t3060.orient, s: 30, show: true }); o.t45 = Object.assign({}, s.t45, { show: true }); o.sel = 't3060'; if (on45) toast('المثلث 30/60 على وتر مثلث 45: خطوط بزوايا 15° و75°', 'info'); }
         else if (a === 'pr') { sfx.clack(); o.pr = Object.assign({}, s.pr, { show: !s.pr.show }); }
         else if (a === 'tape') { sfx.rip(); o.taped = !s.taped; }
