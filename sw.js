@@ -1,10 +1,10 @@
 /* معمل الرسم الفني — offline cache (Designed & Developed by Mohamed-Eldawly) */
-var CACHE = 'dl-v1';
+var CACHE = 'dl-v2';
 var FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
-  'js/sfx.js', 'js/dl-geo.js', 'js/home-tpl.js', 'js/board.js', 'js/lab.js', 'js/app.js',
+  'js/sfx.js', 'js/dl-geo.js', 'js/lessons.js', 'js/board.js', 'js/lab.js', 'js/app.js',
   'assets/logo.png', 'assets/icons/icon-192.png', 'assets/icons/icon-512.png', 'assets/icons/maskable-192.png', 'assets/icons/maskable-512.png', 'assets/icons/apple-touch.png',
-  'assets/fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2', 'assets/fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2', 'assets/fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2', 'assets/fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2',
+  'assets/fonts/reem-kufi-arabic-700-normal.woff2', 'assets/fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2', 'assets/fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2', 'assets/fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2', 'assets/fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2',
   'assets/fonts/ibm-plex-sans-arabic-latin-400-normal.woff2', 'assets/fonts/ibm-plex-sans-arabic-latin-500-normal.woff2', 'assets/fonts/ibm-plex-sans-arabic-latin-600-normal.woff2', 'assets/fonts/ibm-plex-sans-arabic-latin-700-normal.woff2',
   'assets/fonts/ibm-plex-mono-latin-400-normal.woff2', 'assets/fonts/ibm-plex-mono-latin-600-normal.woff2', 'assets/fonts/architects-daughter-latin-400-normal.woff2', 'assets/fonts/reem-kufi-arabic-400-normal.woff2'
 ];

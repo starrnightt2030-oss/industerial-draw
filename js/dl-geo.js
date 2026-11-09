@@ -180,9 +180,9 @@
 
   /* ---------- 2D drawing sheet with the three views ---------- */
   var sheetCache = {};
-  function sheet(m, angle, SW, SH) {
-    SW = SW || 460; SH = SH || 380;
-    var key = m.id + '|' + angle + '|' + SW + 'x' + SH; if (sheetCache[key]) return sheetCache[key];
+  function sheet(m, angle, SW, SH, opts) {
+    SW = SW || 460; SH = SH || 380; opts = opts || {};
+    var key = m.id + '|' + angle + '|' + SW + 'x' + SH + '|' + (opts.dims ? 1 : 0) + (opts.hide || ''); if (sheetCache[key]) return sheetCache[key];
     var first = angle === 1;
     var vc = m._views || (m._views = {});
     function V(y, p) { var k = y + ',' + p; return vc[k] || (vc[k] = hlr(m.solid, y, p)); }
@@ -194,7 +194,7 @@
     function sx(x) { return (X0 + k * x).toFixed(1); } function sy(y) { return (Y0 + k * y).toFixed(1); }
     function vf(v, o) { return function (X, Z) { return sx(o[0] + X - v.minX) + ' ' + sy(o[1] + v.maxZ - Z); }; }
     var vis = '', hid = '';
-    [[fv, pos.f], [tv, pos.t], [sv, pos.s]].forEach(function (a) { var f = vf(a[0], a[1]); vis += pathOf(a[0].vis, f); hid += pathOf(a[0].hid, f); });
+    [[fv, pos.f, 'front'], [tv, pos.t, 'top'], [sv, pos.s, 'side']].forEach(function (a) { if (opts.hide === a[2]) return; var f = vf(a[0], a[1]); vis += pathOf(a[0].vis, f); hid += pathOf(a[0].hid, f); });
     function L(x1, y1, x2, y2) { return 'M' + sx(x1) + ' ' + sy(y1) + 'L' + sx(x2) + ' ' + sy(y2); }
     var cons = '', miter = '', cx, cy, yA, yB, xA, xB;
     if (first) {
@@ -209,7 +209,20 @@
       miter = L(cx - 4, cy + 4, xA + 6, -6);
     }
     function lab(o, w, h, t) { return { x: +(X0 + k * (o[0] + w / 2)).toFixed(0), y: +(Y0 + k * (o[1] + h) + 17).toFixed(0), t: t }; }
-    var res = { vis: vis, hid: hid, cons: cons, miter: miter, labels: [lab(pos.f, wf, hf, 'المسقط الأمامي'), lab(pos.t, wt, ht, 'المسقط الأفقي'), lab(pos.s, ws, hs, first ? 'الجانبي (من اليسار)' : 'الجانبي (من اليمين)')] };
+    var labels = [lab(pos.f, wf, hf, 'المسقط الأمامي'), lab(pos.t, wt, ht, 'المسقط الأفقي'), lab(pos.s, ws, hs, opts.hide === 'side' ? 'المسقط الجانبي = ؟' : (first ? 'الجانبي (من اليسار)' : 'الجانبي (من اليمين)'))];
+    var dl = '', da = '', dt = [];
+    if (opts.dims) {
+      var g = 7, ah = 5, aw = 1.8;
+      var dimH = function (x1, x2, y, ext0, t) { var a = +sx(x1), b = +sx(x2), yy = +sy(y), e0 = +sy(ext0); dl += 'M' + a + ' ' + e0 + 'V' + yy + 'M' + b + ' ' + e0 + 'V' + yy + 'M' + a + ' ' + yy + 'H' + b; da += 'M' + a + ' ' + yy + 'l' + ah + ' ' + (-aw) + 'v' + (2 * aw) + 'zM' + b + ' ' + yy + 'l' + (-ah) + ' ' + (-aw) + 'v' + (2 * aw) + 'z'; dt.push({ x: (a + b) / 2, y: yy - 3, t: t, r: 0 }); };
+      var dimV = function (x, y1, y2, ext0, t) { var a = +sy(y1), b = +sy(y2), xx = +sx(x), e0 = +sx(ext0); dl += 'M' + e0 + ' ' + a + 'H' + xx + 'M' + e0 + ' ' + b + 'H' + xx + 'M' + xx + ' ' + a + 'V' + b; da += 'M' + xx + ' ' + a + 'l' + (-aw) + ' ' + ah + 'h' + (2 * aw) + 'zM' + xx + ' ' + b + 'l' + (-aw) + ' ' + (-ah) + 'h' + (2 * aw) + 'z'; dt.push({ x: xx - 3, y: (a + b) / 2, t: t, r: -90 }); };
+      var r0 = function (v) { return String(Math.round(v)); };
+      var fy = pos.f[1], fx0 = pos.f[0];
+      if (first) dimH(fx0, fx0 + wf, fy - g, fy, r0(wf)); else dimH(fx0, fx0 + wf, fy + hf + g, fy + hf, r0(wf));
+      dimV(fx0 - g, fy, fy + hf, fx0, r0(hf));
+      if (opts.hide !== 'side') { if (first) dimH(pos.s[0], pos.s[0] + ws, pos.s[1] - g, pos.s[1], r0(ws)); else dimH(pos.s[0], pos.s[0] + ws, pos.s[1] - g, pos.s[1], r0(ws)); }
+      else dimV(pos.t[0] - g, pos.t[1], pos.t[1] + ht, pos.t[0], r0(ht));
+    }
+    var res = { vis: vis, hid: hid, cons: cons, miter: miter, labels: labels, dimLines: dl, dimArrows: da, dimText: dt };
     sheetCache[key] = res; return res;
   }
 
@@ -341,6 +354,23 @@
       hr.hid.forEach(function (g) { var a = S(g[0], g[1]), b = S(g[2], g[3]); octx.moveTo(a[0], a[1]); octx.lineTo(b[0], b[1]); }); octx.stroke(); octx.setLineDash([]);
     }
     ctx.save(); ctx.globalAlpha = 1 - 0.85 * u; ctx.drawImage(this.off, 0, 0); ctx.restore();
+    if (st.dims && u < 0.02 && e < 0.02) {
+      var mn = bb.min, mx = bb.max, off = 9;
+      var dim3 = function (a, b, o, t) {
+        var A = P([a[0] + o[0], a[1] + o[1], a[2] + o[2]]), B = P([b[0] + o[0], b[1] + o[1], b[2] + o[2]]), A0 = P(a), B0 = P(b);
+        ctx.strokeStyle = 'rgba(255,214,120,.95)'; ctx.fillStyle = '#FFD678'; ctx.lineWidth = 1.3 * dpr; ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(A0[0], A0[1]); ctx.lineTo(A[0], A[1]); ctx.moveTo(B0[0], B0[1]); ctx.lineTo(B[0], B[1]); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+        var an = Math.atan2(B[1] - A[1], B[0] - A[0]), hs = 9 * dpr;
+        [[A, an], [B, an + Math.PI]].forEach(function (q) { ctx.beginPath(); ctx.moveTo(q[0][0], q[0][1]); ctx.lineTo(q[0][0] + Math.cos(q[1] - 0.3) * hs, q[0][1] + Math.sin(q[1] - 0.3) * hs); ctx.lineTo(q[0][0] + Math.cos(q[1] + 0.3) * hs, q[0][1] + Math.sin(q[1] + 0.3) * hs); ctx.closePath(); ctx.fill(); });
+        var mxp = (A[0] + B[0]) / 2, myp = (A[1] + B[1]) / 2; ctx.font = '600 ' + (14 * dpr) + 'px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        var tw = ctx.measureText(t).width + 10 * dpr; ctx.fillStyle = 'rgba(10,22,48,.9)'; ctx.fillRect(mxp - tw / 2, myp - 10 * dpr, tw, 20 * dpr); ctx.fillStyle = '#FFD678'; ctx.fillText(t, mxp, myp); ctx.textBaseline = 'alphabetic';
+      };
+      var sx2 = view[0] > 0 ? mx[0] : mn[0], sy2 = view[1] > 0 ? mx[1] : mn[1];
+      dim3([mn[0], sy2, mn[2]], [mx[0], sy2, mn[2]], [0, (view[1] > 0 ? 1 : -1) * off, 0], String(Math.round(mx[0] - mn[0])));
+      dim3([sx2, mn[1], mn[2]], [sx2, mx[1], mn[2]], [(view[0] > 0 ? 1 : -1) * off, 0, 0], String(Math.round(mx[1] - mn[1])));
+      var zx = view[0] > 0 ? mn[0] : mx[0];
+      dim3([zx, sy2, mn[2]], [zx, sy2, mx[2]], [(view[0] > 0 ? -1 : 1) * off, (view[1] > 0 ? 1 : -1) * off * 0.0, 0], String(Math.round(mx[2] - mn[2])));
+    }
     // viewing direction arrow
     if (u < 0.02 && e < 0.02 && !st.noArrow) {
       var a1 = P([m.center[0], bb.min[1] - 46, m.center[2]]), a2 = P([m.center[0], bb.min[1] - 8, m.center[2]]);

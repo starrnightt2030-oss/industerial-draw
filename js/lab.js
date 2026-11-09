@@ -12,7 +12,7 @@
     var presets = [['أمامي', 0, 0], ['علوي', 0, 90], ['جانبي يسار', 90, 0], ['جانبي يمين', -90, 0], ['أيزومتري', 45, 35.26], ['منظور', 38, 24]];
     var modes = [['faces', 'ألوان الأوجه'], ['real', 'واقعي'], ['parts', 'الأجزاء']];
     el.innerHTML =
-      DL.header({ kicker: 'الوحدة الثالثة · الإسقاط · المعمل الافتراضي', title: '<span id="lb-title"></span>', actions: '<button class="hb" id="lb-spin" type="button">دوران تلقائي</button>' + DL.soundBtn() + '<a class="hb primary" href="#/board">ارسم على اللوحة</a>' }) +
+      DL.header({ kicker: 'الوحدة الثالثة · الإسقاط · المعمل الافتراضي', title: '<span id="lb-title"></span>', actions: '<button class="hb icon" id="lb-panels" type="button" aria-label="تكبير مساحة المجسم" title="إخفاء/إظهار اللوحات"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M9 4v16"/></svg></button><button class="hb" id="lb-spin" type="button">دوران تلقائي</button>' + DL.soundBtn() + DL.fsBtn() + '<a class="hb primary" href="#/board">ارسم على اللوحة</a>' }) +
       '<div class="body">' +
       '<section class="side side-r" aria-label="التحكم">' +
         '<div class="ptitle">المجسمات <span class="muted">حسب الصعوبة</span></div>' +
@@ -32,6 +32,7 @@
         '<canvas id="lb-cv" class="lab-cv" aria-label="المجسم ثلاثي الأبعاد — اسحب للتدوير"></canvas>' +
         '<div class="hud hud-tr"><span>yaw <b id="lb-yaw">0°</b></span><span>pitch <b id="lb-pitch">0°</b></span><span class="ok" id="lb-vn"></span></div>' +
         '<div class="hud-tl"><button type="button" class="zbtn" id="lb-zin" aria-label="تكبير">+</button><button type="button" class="zbtn" id="lb-zout" aria-label="تصغير">−</button></div>' +
+        '<button type="button" class="reopen" id="lb-reopen" aria-label="إظهار اللوحات"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg><span>اللوحات</span></button>' +
         '<div class="hud hud-b">اسحب بإصبعك لتدوير المجسم · قرّب بإصبعين للتكبير · الأوجه: أصفر أمامي، أخضر جانبي، أزرق علوي</div>' +
       '</main>' +
       '<aside class="side side-l" aria-label="المساقط">' +
@@ -97,6 +98,7 @@
         case 'lb-unbtn': set({ box: true }); sfx.swoosh(1.4, 0.3); var done = function (k) { sfx.play('slide', 0.7 * Math.sin(Math.PI * k)); if (k >= 1) sfx.thud(0.4); }; if (st.u > 0.5) tween({ u: 0, yaw: 38, pitch: 24 }, 1500, done); else tween({ u: 1, yaw: 0, pitch: 0, e: 0, zoom: 1 }, 1700, done); break;
         case 'lb-box': sfx.tick(1200, 0.14); set({ box: !st.box }); break;
         case 'lb-hid': sfx.tick(1200, 0.14); set({ hidden: !st.hidden }); break;
+        case 'lb-panels': case 'lb-reopen': sfx.tick(1200, 0.1); panels = !panels; try { localStorage.setItem('dl-lab-panels', panels ? '1' : '0'); } catch (e) {} applyPanels(); break;
         case 'lb-spin': sfx.tick(1100, 0.12); set({ spin: !st.spin }); break;
         case 'lb-zin': sfx.tick(1300, 0.1); tween({ zoom: Math.min(3, st.zoom * 1.25) }, 300); break;
         case 'lb-zout': sfx.tick(1000, 0.1); tween({ zoom: Math.max(0.5, st.zoom / 1.25) }, 300); break;
@@ -124,7 +126,9 @@
     cv.addEventListener('wheel', function (e) { e.preventDefault(); set({ zoom: Math.max(0.5, Math.min(3, st.zoom * (e.deltaY > 0 ? 0.92 : 1.08))) }); }, { passive: false });
     function onResize() { dirty = true; }
     window.addEventListener('resize', onResize);
-    ui(); loop();
+    var panels = true; try { panels = localStorage.getItem('dl-lab-panels') !== '0'; } catch (e) {}
+    function applyPanels() { el.querySelector('.body').classList.toggle('collapsed', !panels); $('lb-panels').classList.toggle('on', !panels); dirty = true; }
+    applyPanels(); ui(); loop();
     return function () { alive = false; cancelAnimationFrame(raf); cancelAnimationFrame(tw); window.removeEventListener('resize', onResize); };
   }
   window.DLScreens = window.DLScreens || {};

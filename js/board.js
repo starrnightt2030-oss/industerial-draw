@@ -41,88 +41,15 @@
     ['cons', 'خط إنشاء خفيف', 0.2, '', '#8A97AE']
   ];
   var COLORS = [['', 'رصاص', '#3A3F48'], ['#D62828', 'أحمر', '#D62828'], ['#1F6FEB', 'أزرق', '#1F6FEB'], ['#2E9E5B', 'أخضر', '#2E9E5B'], ['#E07B00', 'برتقالي', '#E07B00'], ['#7B3FE4', 'بنفسجي', '#7B3FE4']];
+  var PF = { '2h': 0.55, h: 0.75, hb: 1, b: 1.4, m05: 0.7, m07: 1.05 };
+  function pfOf(pc) { return PF[pc] || 1; }
   function penOf(pc) { return PENS.find(function (x) { return x[0] === pc; }) || PENS[2]; }
   function lineStyle(lt, pc, K, ink) {
     var L = LTYPES.find(function (x) { return x[0] === lt; }) || LTYPES[0], P = penOf(pc);
     var col = ink ? ink : (lt === 'cons' ? 'rgba(110,118,134,.6)' : P[5]);
     var dash = L[3] ? L[3].split(' ').map(function (n) { return fx(Number(n) * K); }).join(' ') : 'none';
-    return { w: fx(Math.max(0.55, L[2] * K * 1.1)), dash: dash, col: col };
+    return { w: fx(Math.max(0.45, L[2] * K * 1.1 * pfOf(pc))), dash: dash, col: col };
   }
-
-  /* ---------- guided lessons (grid) ---------- */
-  var LESSONS = [
-    { id: 'hex', title: 'رسم شكل سداسي منتظم داخل دائرة', short: 'سداسي داخل دائرة',
-      given: 'المعطى: النقطة م مركز الدائرة، وطول ضلع السداسي 40 مم (يساوي نصف قطر الدائرة المحيطة).',
-      steps: [['ارسم خطّي المحور', 'بالمسطرة والمثلث، ارسم خطًا أفقيًا وخطًا رأسيًا يمرّان بالنقطة م باستخدام «خط المحور».'],
-        ['ارسم الدائرة', 'افتح الفرجار 40 مم، ضع السن في م وارسم دائرة كاملة، فتقطع المحور الأفقي في أ و ب.'],
-        ['حدّد رؤوس السداسي', 'بنفس الفتحة، ضع السن في أ وارسم قوسين يقطعان الدائرة، ثم كرّر من ب.'],
-        ['صِل الرؤوس', 'بالمسطرة و«الخط الظاهر» صِل النقاط الست المتجاورة فينتج السداسي المنتظم.']],
-      geo: function (K) { var C = [PX.x + 150 * K, PX.y + 112 * K], R = 40 * K, V = []; for (var k = 0; k < 6; k++) V.push([C[0] + R * Math.cos(k * Math.PI / 3), C[1] + R * Math.sin(k * Math.PI / 3)]); return { C: C, R: R, V: V, A: V[0], B: V[3], pts: [C], labels: [[C, 'م', -22, -10]] }; },
-      check: function (st, G, K) {
-        var tol = 1.6 * K, lines = st.filter(function (s) { return s.k === 'line'; }), arcs = st.filter(function (s) { return s.k === 'arc'; });
-        function through(l, P) { return segInfo(P, [l.x1, l.y1], [l.x2, l.y2]).d < tol; }
-        function ang(l) { return Math.abs(Math.atan2(l.y2 - l.y1, l.x2 - l.x1) * 180 / Math.PI) % 180; }
-        function len(l) { return Math.hypot(l.x2 - l.x1, l.y2 - l.y1); }
-        var s1 = lines.some(function (l) { return l.lt === 'center' && through(l, G.C) && (ang(l) < 2 || ang(l) > 178) && len(l) > G.R * 1.5; }) && lines.some(function (l) { return l.lt === 'center' && through(l, G.C) && Math.abs(ang(l) - 90) < 2 && len(l) > G.R * 1.5; });
-        var s2 = arcs.some(function (a) { return dist([a.cx, a.cy], G.C) < tol && Math.abs(a.r - G.R) < tol && Math.abs(a.sw) > 2 * Math.PI - 0.25; });
-        function cov(P, angs) { return angs.every(function (t) { return arcs.some(function (a) { return dist([a.cx, a.cy], P) < tol && Math.abs(a.r - G.R) < tol && angIn(t, a.a0, a.sw); }); }); }
-        var s3 = cov(G.A, [2 * Math.PI / 3, -2 * Math.PI / 3]) && cov(G.B, [Math.PI / 3, -Math.PI / 3]);
-        var sides = 0; for (var k = 0; k < 6; k++) { var P = G.V[k], Q = G.V[(k + 1) % 6]; if (lines.some(function (l) { return l.lt === 'visible' && ((dist([l.x1, l.y1], P) < tol && dist([l.x2, l.y2], Q) < tol) || (dist([l.x1, l.y1], Q) < tol && dist([l.x2, l.y2], P) < tol)); })) sides++; }
-        var r = [s1, s2, s3, sides === 6]; r.extra = sides ? sides + '/6' : ''; return r;
-      },
-      lineType: ['center', null, null, 'visible'],
-      arcFeedback: function (cp, G, K) { var tol = 1.6 * K; if ((dist([cp.cx, cp.cy], G.C) < tol || dist([cp.cx, cp.cy], G.A) < tol || dist([cp.cx, cp.cy], G.B) < tol) && Math.abs(cp.r - G.R) >= tol) return 'نصف القطر ' + (Math.round(cp.r / K * 10) / 10) + ' مم — المطلوب 40 مم'; return ''; },
-      demo: function (i, G, K, A) {
-        var L = 55 * K;
-        if (i === 0) return [A.line([G.C[0] - L, G.C[1]], [G.C[0] + L, G.C[1]], 'center', 'h'), A.line([G.C[0], G.C[1] - L], [G.C[0], G.C[1] + L], 'center', 'h')];
-        if (i === 1) return [A.arc(G.C, G.R, -Math.PI / 2, 2 * Math.PI)];
-        if (i === 2) return [A.arc(G.A, G.R, 2 * Math.PI / 3 - 0.3, 0.6), A.arc(G.A, G.R, -2 * Math.PI / 3 - 0.3, 0.6), A.arc(G.B, G.R, Math.PI / 3 - 0.3, 0.6), A.arc(G.B, G.R, -Math.PI / 3 - 0.3, 0.6)];
-        return [0, 1, 2, 3, 4, 5].map(function (j) { return A.line(G.V[j], G.V[(j + 1) % 6], 'visible', 'm07'); });
-      },
-      ghost: function (i, G, K) {
-        var L = 55 * K;
-        if (i === 0) return 'M' + fx(G.C[0] - L) + ' ' + fx(G.C[1]) + 'H' + fx(G.C[0] + L) + 'M' + fx(G.C[0]) + ' ' + fx(G.C[1] - L) + 'V' + fx(G.C[1] + L);
-        if (i === 1) return arcD(G.C[0], G.C[1], G.R, 0, 2 * Math.PI);
-        if (i === 2) return arcD(G.A[0], G.A[1], G.R, 2 * Math.PI / 3 - 0.3, 0.6) + arcD(G.A[0], G.A[1], G.R, -2 * Math.PI / 3 - 0.3, 0.6) + arcD(G.B[0], G.B[1], G.R, Math.PI / 3 - 0.3, 0.6) + arcD(G.B[0], G.B[1], G.R, -Math.PI / 3 - 0.3, 0.6);
-        return 'M' + G.V.map(function (v) { return fx(v[0]) + ' ' + fx(v[1]); }).join('L') + 'Z';
-      } },
-    { id: 'bis', title: 'تنصيف قطعة مستقيمة معلومة', short: 'تنصيف قطعة مستقيمة',
-      given: 'المعطى: القطعة المستقيمة أ ب طولها 60 مم. المطلوب رسم العمود المنصّف لها.',
-      steps: [['ارسم قوسين من أ', 'افتح الفرجار أكثر من نصف أ ب (مثلًا 40 مم)، ضع السن في أ وارسم قوسًا فوق القطعة وقوسًا تحتها.'],
-        ['ارسم قوسين من ب', 'بنفس الفتحة، ضع السن في ب وارسم قوسين يقطعان القوسين السابقين في نقطتين.'],
-        ['ارسم العمود المنصّف', 'صِل نقطتي التقاطع بالمسطرة؛ هذا الخط عمودي على أ ب ويقسمها نصفين متساويين.']],
-      geo: function (K) { var A = [PX.x + 110 * K, PX.y + 115 * K], B = [PX.x + 170 * K, PX.y + 115 * K]; return { A: A, B: B, pts: [A, B], seg: [A, B], labels: [[A, 'أ', -6, 26], [B, 'ب', -6, 26]], R: 40 * K, h: 30 * K }; },
-      check: function (st, G, K) {
-        var tol = 1.6 * K, arcs = st.filter(function (s) { return s.k === 'arc'; }), lines = st.filter(function (s) { return s.k === 'line'; });
-        var half = dist(G.A, G.B) / 2;
-        function radii(P, base) {
-          var from = arcs.filter(function (a) { return dist([a.cx, a.cy], P) < tol && a.r > half + 1 * K && a.r < half * 2.2; }), ok = [];
-          from.forEach(function (a) { var t = Math.acos(half / a.r), same = from.filter(function (b) { return Math.abs(b.r - a.r) < tol; }); if (same.some(function (b) { return angIn(base + t, b.a0, b.sw); }) && same.some(function (b) { return angIn(base - t, b.a0, b.sw); })) ok.push(a.r); });
-          return ok;
-        }
-        var ra = radii(G.A, 0), rb = radii(G.B, Math.PI);
-        var s1 = ra.length > 0, match = null;
-        ra.forEach(function (r1) { rb.forEach(function (r2) { if (Math.abs(r1 - r2) < tol) match = (r1 + r2) / 2; }); });
-        var s2 = s1 && match !== null;
-        var r = match || G.R, h = Math.sqrt(Math.max(0, r * r - half * half)), M = [(G.A[0] + G.B[0]) / 2, (G.A[1] + G.B[1]) / 2];
-        var s3 = s2 && lines.some(function (l) { return segInfo([M[0], M[1] - h], [l.x1, l.y1], [l.x2, l.y2]).d < tol && segInfo([M[0], M[1] + h], [l.x1, l.y1], [l.x2, l.y2]).d < tol; });
-        var res = [s1, s2, s3]; res.extra = ''; return res;
-      },
-      lineType: [null, null, 'visible'],
-      arcFeedback: function (cp, G, K) { var tol = 1.6 * K, half = dist(G.A, G.B) / 2; if ((dist([cp.cx, cp.cy], G.A) < tol || dist([cp.cx, cp.cy], G.B) < tol) && cp.r <= half + K) return 'الفتحة لازم تكون أكبر من نصف أ ب (30 مم)'; return ''; },
-      demo: function (i, G, K, A) {
-        var t = Math.acos(30 / 40);
-        if (i === 0) return [A.arc(G.A, G.R, -t - 0.3, 0.6), A.arc(G.A, G.R, t - 0.3, 0.6)];
-        if (i === 1) return [A.arc(G.B, G.R, Math.PI + t - 0.3, 0.6), A.arc(G.B, G.R, Math.PI - t - 0.3, 0.6)];
-        var M = [(G.A[0] + G.B[0]) / 2, (G.A[1] + G.B[1]) / 2], h = Math.sqrt(40 * 40 - 30 * 30) * K + 12 * K; return [A.line([M[0], M[1] - h], [M[0], M[1] + h], 'visible', 'hb')];
-      },
-      ghost: function (i, G, K) {
-        var t = Math.acos(30 / 40);
-        if (i === 0) return arcD(G.A[0], G.A[1], G.R, -t - 0.3, 0.6) + arcD(G.A[0], G.A[1], G.R, t - 0.3, 0.6);
-        if (i === 1) return arcD(G.B[0], G.B[1], G.R, Math.PI + t - 0.3, 0.6) + arcD(G.B[0], G.B[1], G.R, Math.PI - t - 0.3, 0.6);
-        var M = [(G.A[0] + G.B[0]) / 2, (G.A[1] + G.B[1]) / 2], h = 38 * K; return 'M' + fx(M[0]) + ' ' + fx(M[1] - h) + 'V' + fx(M[1] + h);
-      } }
-  ];
 
   var ICON = {
     pencil: 'M22 4l6 6L12 26l-8 2 2-8z M18 8l6 6', hand: 'M4 24c4-8 6 2 9-6s5 6 8-2 4 4 7 0M6 28h20',
@@ -144,18 +71,21 @@
       sel: 't45', tool: 'pencil', pencil: 'hb', line: grid ? 'center' : 'visible',
       strokes: [], hist: [], fut: [], comp: null, dim: null, draft: null, freeDraft: null, hover: null, chip: null,
       taped: true, assist: false, rec: false, tab: grid ? 'steps' : 'pens', text: 'مسقط أمامي', tsize: 5, lastDim: -1,
-      dv: { L: 61, W: 50, H: 64, T: 50 }, showHint: false, toast: null, demo: false, lesson: 0, ink: ''
+      dv: { L: 61, W: 50, H: 64, T: 50 }, showHint: false, toast: null, demo: false, demoAt: -1, lesson: 0, phase: 'explain', ink: '', panels: true, pv: null
     };
-    try { var saved = JSON.parse(localStorage.getItem('dl-' + variant) || 'null'); if (saved && saved.strokes) { s.strokes = saved.strokes; s.lesson = saved.lesson || 0; } } catch (e) {}
+    try { var saved = JSON.parse(localStorage.getItem('dl-' + variant) || 'null'); if (saved && saved.strokes) { s.strokes = saved.strokes; s.lesson = saved.lesson || 0; s.phase = saved.phase || 'explain'; } } catch (e) {}
+    try { s.panels = localStorage.getItem('dl-panels') !== '0'; } catch (e) {}
     var timers = [], raf = 0, drag = null, svg, alive = true;
     function later(fn, ms) { var t = setTimeout(fn, ms); timers.push(t); return t; }
-    function persist() { try { localStorage.setItem('dl-' + variant, JSON.stringify({ strokes: s.strokes, lesson: s.lesson })); } catch (e) {} }
+    function persist() { try { localStorage.setItem('dl-' + variant, JSON.stringify({ strokes: s.strokes, lesson: s.lesson, phase: s.phase })); } catch (e) {} }
     var pending = false;
     function set(o) { for (var k in o) s[k] = o[k]; if (!pending) { pending = true; requestAnimationFrame(function () { pending = false; if (alive) render(); }); } }
     function toast(t, kind) { DL.toast(t, kind); }
-    function L() { return LESSONS[s.lesson] || LESSONS[0]; }
-    function lgeo() { return L().geo(K); }
-    function ldone(st) { return L().check(st || s.strokes, lgeo(), K); }
+    var LS = window.DLLessons, lessonCache = {}, demoStop = false;
+    if (!LS.list[s.lesson]) s.lesson = 0;
+    function L() { return lessonCache[s.lesson] || (lessonCache[s.lesson] = LS.build(s.lesson, K, PX)); }
+    function ldone(st) { return LS.check(L(), st || s.strokes, K); }
+    function curStep(dn) { dn = dn || ldone(); return dn.findIndex(function (v) { return !v; }); }
 
     /* ---------- tool geometry ---------- */
     function pose(id) {
@@ -208,7 +138,7 @@
       for (var i = 0; i < lines.length; i++) for (var j = i + 1; j < lines.length; j++) { var x = segX([lines[i].x1, lines[i].y1], [lines[i].x2, lines[i].y2], [lines[j].x1, lines[j].y1], [lines[j].x2, lines[j].y2]); if (x) P.push(x); }
       arcs.forEach(function (a) { lines.forEach(function (l) { var A = [l.x1, l.y1], B = [l.x2, l.y2], dx = B[0] - A[0], dy = B[1] - A[1], f0 = A[0] - a.cx, g0 = A[1] - a.cy, aa = dx * dx + dy * dy, bb = 2 * (f0 * dx + g0 * dy), cc = f0 * f0 + g0 * g0 - a.r * a.r, D = bb * bb - 4 * aa * cc; if (D < 0 || aa < 1e-9) return; [(-bb - Math.sqrt(D)) / (2 * aa), (-bb + Math.sqrt(D)) / (2 * aa)].forEach(function (t) { if (t >= -0.001 && t <= 1.001) { var q = [A[0] + dx * t, A[1] + dy * t]; if (angIn(Math.atan2(q[1] - a.cy, q[0] - a.cx), a.a0, a.sw)) P.push(q); } }); }); });
       for (var m = 0; m < arcs.length; m++) for (var n = m + 1; n < arcs.length; n++) { var a = arcs[m], b = arcs[n], d = dist([a.cx, a.cy], [b.cx, b.cy]); if (d < 1e-6 || d > a.r + b.r || d < Math.abs(a.r - b.r)) continue; var xx = (d * d + a.r * a.r - b.r * b.r) / (2 * d), h = Math.sqrt(Math.max(0, a.r * a.r - xx * xx)), ux = (b.cx - a.cx) / d, uy = (b.cy - a.cy) / d; [[a.cx + ux * xx - uy * h, a.cy + uy * xx + ux * h], [a.cx + ux * xx + uy * h, a.cy + uy * xx - ux * h]].forEach(function (q) { if (angIn(Math.atan2(q[1] - a.cy, q[0] - a.cx), a.a0, a.sw) && angIn(Math.atan2(q[1] - b.cy, q[0] - b.cx), b.a0, b.sw)) P.push(q); }); }
-      if (grid) { var g = lgeo(); g.pts.forEach(function (q) { P.push(q); }); if (g.seg) { P.push([(g.seg[0][0] + g.seg[1][0]) / 2, (g.seg[0][1] + g.seg[1][1]) / 2]); } }
+      if (grid) L().snap.forEach(function (q) { P.push(q); });
       snapFor = st; snapCache = P; return P;
     }
     function snap(p, r) {
@@ -222,19 +152,21 @@
       return Math.max(0, Math.min(Lh, best));
     }
     function commit(next, msg) {
-      var before = grid ? ldone() : null;
+      var before = grid && !s.demo ? ldone() : null;
       set({ strokes: next, hist: s.hist.concat([s.strokes]).slice(-80), fut: [] }); persist();
-      if (grid) { var after = ldone(next); for (var i = 0; i < after.length; i++) if (after[i] && !before[i]) { sfx.chime(); toast('أحسنت! الخطوة ' + (i + 1) + ' صحيحة', 'ok'); if (after.every(Boolean)) later(function () { toast('ممتاز! أكملت التمرين بنجاح', 'ok'); }, 1400); return; } }
+      if (before) { var after = ldone(next); for (var i = 0; i < after.length; i++) if (after[i] && !before[i]) { sfx.chime(); toast('أحسنت! الخطوة ' + (i + 1) + ' صحيحة', 'ok'); if (after.every(Boolean)) later(function () { toast('ممتاز! أكملت التمرين بنجاح', 'ok'); }, 1400); return; } }
       if (msg) msg();
     }
     function cgeo(cp) {
-      var Lc = C.compL, u = [Math.cos(cp.ang), Math.sin(cp.ang)], n = [u[1], -u[0]], c = [cp.cx, cp.cy], P = [cp.cx + cp.r * u[0], cp.cy + cp.r * u[1]];
+      var Lc = C.compL, u = [Math.cos(cp.ang), Math.sin(cp.ang)], n = cp.flip ? [-u[1], u[0]] : [u[1], -u[0]], c = [cp.cx, cp.cy], P = [cp.cx + cp.r * u[0], cp.cy + cp.r * u[1]];
       var h = Math.sqrt(Math.max(0, Lc * Lc - cp.r * cp.r / 4)), H = [(c[0] + P[0]) / 2 + n[0] * h, (c[1] + P[1]) / 2 + n[1] * h];
-      return { c: c, P: P, H: H, ax: n, G: [H[0] + n[0] * 52, H[1] + n[1] * 52], Kn: [H[0] + (P[0] - H[0]) * 0.5, H[1] + (P[1] - H[1]) * 0.5] };
+      var lab = [H[0] + n[0] * 110, H[1] + n[1] * 110];
+      return { c: c, P: P, H: H, ax: n, G: [H[0] + n[0] * 52, H[1] + n[1] * 52], Kn: [H[0] + (P[0] - H[0]) * 0.5, H[1] + (P[1] - H[1]) * 0.5], lab: lab, F: [lab[0] + 86, lab[1]] };
     }
     function maxR() { return C.compL * 1.9; }
     function compassHit(p) {
       var g = cgeo(s.comp);
+      if (dist(p, g.F) < 22) return 'flip';
       if (dist(p, g.P) < 26) return 'draw';
       if (dist(p, g.Kn) < 20) return 'open';
       if (dist(p, g.G) < 38 || dist(p, [g.H[0] + g.ax[0] * 26, g.H[1] + g.ax[1] * 26]) < 22) return 'rot';
@@ -243,22 +175,31 @@
     }
     function anim(ms, frame, done) { var t0 = performance.now(); function step(t) { if (!alive) return; var k = Math.min(1, (t - t0) / ms); frame(k); if (k < 1) raf = requestAnimationFrame(step); else if (done) done(); } raf = requestAnimationFrame(step); }
 
-    /* ---------- demo (teacher shows the step) ---------- */
-    function demoStep(i) {
-      if (s.demo) return; var G = lgeo(); set({ demo: true, tool: 'pencil' });
+    /* ---------- demo (teacher shows the steps) ---------- */
+    function runDemo(steps) {
+      if (s.demo) return; demoStop = false; set({ demo: true, tool: 'pencil', showHint: false });
       var A = {
-        line: function (a, b, lt, pc) { return function (next) { anim(850, function (k) { sfx.play('pencil', 0.85); set({ draft: { a: a, b: [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k], lt: lt, pc: pc } }); }, function () { set({ draft: null }); commit(s.strokes.concat([{ k: 'line', x1: a[0], y1: a[1], x2: b[0], y2: b[1], lt: lt, pc: pc, anim: 1 }])); sfx.clack(); later(next, 220); }); }; },
+        line: function (a, b, lt, pc) { return function (next) { var Ld = dist(a, b); anim(Math.max(420, Math.min(950, Ld * 2.2)), function (k) { sfx.play('pencil', 0.85); set({ draft: { a: a, b: [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k], lt: lt, pc: pc } }); }, function () { set({ draft: null }); commit(s.strokes.concat([{ k: 'line', x1: a[0], y1: a[1], x2: b[0], y2: b[1], lt: lt, pc: pc, anim: 1 }])); sfx.clack(); later(next, 160); }); }; },
         arc: function (c, R, a0, sw) { return function (next) {
-          set({ tool: 'compass', comp: { cx: c[0], cy: c[1], r: 0, ang: a0, stage: 'open' } });
-          anim(550, function (k) { sfx.play('squeak', 0.6); set({ comp: { cx: c[0], cy: c[1], r: R * k, ang: a0, stage: 'open' } }); }, function () {
-            anim(Math.max(500, Math.abs(sw) / (2 * Math.PI) * 1800), function (k) { sfx.play('pencil', 0.8); sfx.play('squeak', 0.25); set({ comp: { cx: c[0], cy: c[1], r: R, ang: a0 + sw * k, stage: 'draw', a0: a0, sw: sw * k } }); }, function () {
-              commit(s.strokes.concat([{ k: 'arc', cx: c[0], cy: c[1], r: R, a0: a0, sw: sw, lt: 'visible', pc: 'h', anim: 1 }])); set({ comp: { cx: c[0], cy: c[1], r: R, ang: a0 + sw, stage: 'ready' } }); later(next, 260);
+          var prev = s.comp, from = prev && dist([prev.cx, prev.cy], c) < 1 ? prev.r : 0;
+          set({ tool: 'compass', comp: { cx: c[0], cy: c[1], r: from, ang: a0, stage: 'open' } });
+          anim(Math.abs(R - from) < 1 ? 120 : 480, function (k) { sfx.play('squeak', 0.6); set({ comp: { cx: c[0], cy: c[1], r: from + (R - from) * k, ang: a0, stage: 'open' } }); }, function () {
+            anim(Math.max(420, Math.abs(sw) / (2 * Math.PI) * 1700), function (k) { sfx.play('pencil', 0.8); sfx.play('squeak', 0.25); set({ comp: { cx: c[0], cy: c[1], r: R, ang: a0 + sw * k, stage: 'draw', a0: a0, sw: sw * k } }); }, function () {
+              commit(s.strokes.concat([{ k: 'arc', cx: c[0], cy: c[1], r: R, a0: a0, sw: sw, lt: 'visible', pc: 'h', anim: 1 }])); set({ comp: { cx: c[0], cy: c[1], r: R, ang: a0 + sw, stage: 'ready' } }); later(next, 200);
             });
           });
         }; }
       };
-      var seq = L().demo(i, G, K, A), j = 0;
-      (function go() { if (j >= seq.length) { set({ demo: false, draft: null, tool: 'pencil' }); return; } seq[j++](go); })();
+      var seq = [];
+      steps.forEach(function (i) {
+        seq.push(function (next) { set({ demoAt: i }); if (steps.length > 1) toast('الخطوة ' + (i + 1) + ': ' + L().steps[i].title, 'info'); later(next, steps.length > 1 ? 650 : 0); });
+        LS.demo(L(), i).forEach(function (a) { seq.push(a.k === 'line' ? A.line(a.a, a.b, a.lt || 'visible', a.pc || 'h') : A.arc(a.c, a.r, a.a0, a.sw)); });
+      });
+      var j = 0;
+      (function go() {
+        if (demoStop || j >= seq.length) { var fin = !demoStop; demoStop = false; set({ demo: false, demoAt: -1, draft: null, tool: 'pencil' }); if (fin && steps.length > 1) { sfx.chime(); toast('انتهى الشرح — اضغط «ابدأ التنفيذ بنفسك» وطبّق الخطوات بيدك', 'ok'); } return; }
+        seq[j++](go);
+      })();
     }
     /* ---------- paper division ---------- */
     function divDraw() {
@@ -319,6 +260,7 @@
       if (s.tool === 'compass' && s.comp && s.comp.r >= 4 && s.comp.stage !== 'draw') {
         var ch = compassHit(p), cg = cgeo(s.comp);
         if (ch === 'draw') { var an0 = Math.atan2(p[1] - s.comp.cy, p[0] - s.comp.cx); drag = { k: 'cdraw', last: an0, a0: s.comp.ang, sw: 0, lp: p }; set({ comp: Object.assign({}, s.comp, { stage: 'draw', a0: s.comp.ang, sw: 0 }) }); return; }
+        if (ch === 'flip') { sfx.clack(); sfx.swoosh(0.8, 0.2); set({ comp: Object.assign({}, s.comp, { flip: !s.comp.flip }) }); toast(s.comp.flip ? 'الفرجار مقلوب للجهة الأخرى' : 'الفرجار في وضعه الطبيعي', 'info'); return; }
         if (ch === 'open') { drag = { k: 'copen2', r0: s.comp.r, d0: dist(p, cg.c), lp: p }; sfx.tick(1400, 0.12); return; }
         if (ch === 'rot') { drag = { k: 'crot', last: Math.atan2(p[1] - s.comp.cy, p[0] - s.comp.cx), lp: p }; sfx.tick(1100, 0.1); return; }
         if (ch === 'move') { drag = { k: 'cmove', off: [p[0] - s.comp.cx, p[1] - s.comp.cy], lp: p }; sfx.tick(1000, 0.1); return; }
@@ -402,7 +344,7 @@
         var dr = s.draft; set({ draft: null, chip: null }); if (!dr || dist(dr.a, dr.b) < 4) return;
         sfx.tick(700, 0.06); var line = s.line, pen = penOf(s.pencil);
         commit(s.strokes.concat([{ k: 'line', x1: dr.a[0], y1: dr.a[1], x2: dr.b[0], y2: dr.b[1], lt: s.line, pc: s.pencil, ink: s.ink }]), function () {
-          if (grid) { var dn = ldone(), cur = dn.findIndex(function (v) { return !v; }), need = L().lineType[cur]; if (need && line !== need) toast(need === 'center' ? 'هذه الخطوة تُرسم بنوع «خط المحور»' : 'هذه الخطوة تُرسم بـ «الخط الظاهر»', 'warn'); else if (dn.extra) toast('أضلاع صحيحة: ' + dn.extra, 'info'); }
+          if (grid) { var dn = ldone(), cur = curStep(dn), need = LS.lineType(L(), cur); if (need && line !== need) toast(need === 'center' ? 'هذه الخطوة تُرسم بنوع «خط المحور»' : 'هذه الخطوة تُرسم بـ «الخط الظاهر»', 'warn'); else if (dn.extra) toast('أضلاع صحيحة: ' + dn.extra, 'info'); }
           else if (pen[0] === 'm05' && line === 'visible') toast('للخط الظاهر (0.7) استخدم القلم الميكانيكي 0.7', 'warn');
         });
         return;
@@ -414,7 +356,7 @@
         var cp = s.comp; if (Math.abs(d.sw) < 0.04) { set({ comp: Object.assign({}, cp, { stage: 'ready' }) }); return; }
         var sw = Math.abs(d.sw) > 2 * Math.PI - 0.12 ? 2 * Math.PI : d.sw;
         set({ comp: Object.assign({}, cp, { stage: 'ready' }) });
-        commit(s.strokes.concat([{ k: 'arc', cx: cp.cx, cy: cp.cy, r: cp.r, a0: d.a0, sw: sw, lt: s.line, pc: s.pencil, ink: s.ink }]), function () { if (!grid) return; var msg = L().arcFeedback(cp, lgeo(), K); if (msg) { sfx.err(); toast(msg, 'err'); } });
+        commit(s.strokes.concat([{ k: 'arc', cx: cp.cx, cy: cp.cy, r: cp.r, a0: d.a0, sw: sw, lt: s.line, pc: s.pencil, ink: s.ink }]), function () { if (!grid) return; var cs = curStep(); var msg = cs >= 0 ? LS.arcFeedback(L(), cs, cp, K) : ''; if (msg) { sfx.err(); toast(msg, 'err'); } });
         return;
       }
       if (d.k === 'dim') { var dm = s.dim; if (!dm || dist(dm.a, dm.b) < 6) { set({ dim: null }); return; } set({ dim: Object.assign({}, dm, { stage: 'off' }) }); toast('حرّك لتحديد مكان خط البُعد ثم اضغط للتثبيت', 'info'); return; }
@@ -425,7 +367,9 @@
     var tabsList = grid ? [['steps', 'الخطوات'], ['pens', 'الأقلام'], ['write', 'الكتابة']] : [['pens', 'الأقلام'], ['div', 'التقسيم'], ['write', 'الكتابة']];
     el.innerHTML =
       DL.header({ kicker: grid ? 'الوحدة الثانية · ورقة المربعات · تطبيق موجّه' : 'الوحدة الأولى · لوحة الرسم الخشبية', title: grid ? 'التطبيق بالأدوات خطوة بخطوة' : 'الرسم بالأدوات على لوحة A3',
-        actions: '<button class="hb rec" id="bd-rec" type="button"><span class="dot"></span><span class="lbl">تسجيل الشرح</span></button>' + DL.soundBtn() +
+        actions: '<button class="hb pvbtn" id="bd-pv" type="button" aria-label="منظور للتمرين"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg><span class="lbl">منظور للتمرين</span></button>' +
+          '<button class="hb icon" id="bd-panels" type="button" aria-label="تكبير مساحة الرسم" title="إخفاء/إظهار اللوحات"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M8 10l2 2-2 2"/></svg></button>' +
+          '<button class="hb rec" id="bd-rec" type="button"><span class="dot"></span><span class="lbl">تسجيل الشرح</span></button>' + DL.soundBtn() + DL.fsBtn() +
           '<button class="hb icon" id="bd-undo" type="button" aria-label="تراجع"><svg viewBox="0 0 24 24"><path d="M15 7l4 4-4 4"/><path d="M19 11H9a5 5 0 000 10h2"/></svg></button>' +
           '<button class="hb icon" id="bd-redo" type="button" aria-label="إعادة"><svg viewBox="0 0 24 24"><path d="M9 7l-4 4 4 4"/><path d="M5 11h10a5 5 0 010 10h-2"/></svg></button>' +
           '<button class="hb wide" id="bd-clear" type="button">ورقة جديدة</button>' +
@@ -437,6 +381,8 @@
         '<g id="L-paper"></g><g id="L-tape"></g><g id="L-given"></g><g id="L-strokes" filter="url(#graphite)"></g><g id="L-draft" filter="url(#graphite)"></g><g id="L-tools"></g><g id="L-top"></g></svg>' +
         '<div class="untaped" id="bd-untaped" hidden>الورقة غير مثبتة — ثبّتها بالشريط اللاصق قبل الرسم</div>' +
         '<div class="status" id="bd-status"></div>' +
+        '<button type="button" class="reopen" id="bd-reopen" aria-label="إظهار اللوحات"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg><span>الأدوات</span></button>' +
+        '<div class="pvwin" id="bd-pvwin" hidden></div>' +
       '</main>' +
       '<aside class="side side-l bpanel" aria-label="لوحة الخيارات"><div class="seg tabs" id="bd-tabs" role="tablist">' + tabsList.map(function (t) { return '<button type="button" role="tab" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div><div id="bd-panel" class="panel-body"></div></aside>' +
       '</div>' + DL.footer();
@@ -485,7 +431,7 @@
       if (x.k === 'arc') { var sa = lineStyle(x.lt, x.pc, K, x.ink); return '<path d="' + arcD(x.cx, x.cy, x.r, x.a0, x.sw) + '" fill="none" stroke="' + sa.col + '" stroke-width="' + sa.w + '"' + (sa.dash !== 'none' ? ' stroke-dasharray="' + sa.dash + '"' : '') + ' stroke-linecap="round"' + (x.anim ? ' class="' + (sa.dash === 'none' ? 'drawin' : 'fadein') + '"' : '') + '/>'; }
       if (x.k === 'dim' || x.k === 'dia') { var g = x.k === 'dim' ? dimGeo(x) : diaGeo(x), col = x.ink || 'rgba(38,42,50,.92)'; return '<g><path d="' + g.lines + '" fill="none" stroke="' + col + '" stroke-width="' + fx(Math.max(0.6, 0.3 * K)) + '"/><path d="' + g.arrows + '" fill="' + col + '"/><text transform="' + g.tt + '" text-anchor="middle" class="hand" font-size="' + fx(4.2 * K) + '" fill="' + col + '">' + esc(g.t) + '</text></g>'; }
       if (x.k === 'text') return '<text x="' + fx(x.x) + '" y="' + fx(x.y) + '" text-anchor="middle" class="hand" font-size="' + fx(x.fs * K * 1.15) + '" fill="' + (x.ink || penOf(x.pc)[5]) + '">' + esc(x.t) + '</text>';
-      if (x.k === 'free') return '<path d="' + freeD(x.pts) + '" fill="none" stroke="' + (x.ink || penOf(x.pc)[5]) + '" stroke-width="' + fx(Math.max(0.9, 0.45 * K)) + '" stroke-linecap="round" stroke-linejoin="round"/>';
+      if (x.k === 'free') return '<path d="' + freeD(x.pts) + '" fill="none" stroke="' + (x.ink || penOf(x.pc)[5]) + '" stroke-width="' + fx(Math.max(0.7, 0.45 * K * pfOf(x.pc))) + '" stroke-linecap="round" stroke-linejoin="round"/>';
       return '';
     }
     function compassSvg(cp) {
@@ -494,7 +440,7 @@
       function lerp(A, B, t) { return [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t]; }
       var N1 = lerp(H, c, 0.9), N2 = lerp(H, P, 0.78), N3 = lerp(H, P, 0.94), Kj = lerp(H, c, 0.45), G0 = [H[0] + ax[0] * 18, H[1] + ax[1] * 18], G1 = [H[0] + ax[0] * 84, H[1] + ax[1] * 84], kn = '';
       for (var i = 0; i < 8; i++) { var q = lerp(G0, G1, 0.12 + i * 0.1), pn = [-ax[1] * 12, ax[0] * 12]; kn += 'M' + fx(q[0] + pn[0]) + ' ' + fx(q[1] + pn[1]) + 'L' + fx(q[0] - pn[0]) + ' ' + fx(q[1] - pn[1]); }
-      var mm = Math.round(cp.r / K * 10) / 10, lab = [G1[0] + ax[0] * 26, G1[1] + ax[1] * 26];
+      var mm = Math.round(cp.r / K * 10) / 10, lab = g.lab, F = g.F;
       return '<g filter="url(#tShadow)">' +
         '<path d="' + leg(H, N1, 9, 4) + '" fill="url(#metal)" stroke="#5E697C" stroke-width=".9" stroke-linejoin="round"/>' +
         '<path d="' + leg(H, N2, 9, 5.5) + '" fill="url(#metal)" stroke="#5E697C" stroke-width=".9" stroke-linejoin="round"/>' +
@@ -504,7 +450,8 @@
         '<circle cx="' + fx(H[0]) + '" cy="' + fx(H[1]) + '" r="22" fill="url(#metal)" stroke="#5E697C" stroke-width="1.2"/><circle cx="' + fx(H[0]) + '" cy="' + fx(H[1]) + '" r="8" fill="#4F5A6E"/>' +
         '<circle cx="' + fx(g.Kn[0]) + '" cy="' + fx(g.Kn[1]) + '" r="9" fill="url(#screw)" stroke="' + (act ? '#F2C94C' : '#5E697C') + '" stroke-width="' + (act ? 2.5 : 1) + '"/></g>' +
         (act ? '<circle cx="' + fx(P[0]) + '" cy="' + fx(P[1]) + '" r="15" fill="rgba(227,20,27,.12)" stroke="#E3141B" stroke-width="2" stroke-dasharray="5 4"/>' : '') +
-        '<g class="mono" pointer-events="none"><rect x="' + fx(lab[0] - 59) + '" y="' + fx(lab[1] - 15) + '" width="118" height="30" rx="9" fill="#0A1630" fill-opacity=".92"/><text x="' + fx(lab[0]) + '" y="' + fx(lab[1] + 6) + '" text-anchor="middle" fill="#FFFFFF" font-size="14" font-weight="600">R = ' + mm + ' mm</text></g>';
+        '<g class="mono" pointer-events="none"><rect x="' + fx(lab[0] - 59) + '" y="' + fx(lab[1] - 15) + '" width="118" height="30" rx="9" fill="#0A1630" fill-opacity=".92"/><text x="' + fx(lab[0]) + '" y="' + fx(lab[1] + 6) + '" text-anchor="middle" fill="#FFFFFF" font-size="14" font-weight="600">R = ' + mm + ' mm</text></g>' +
+        (act ? '<g transform="translate(' + fx(F[0]) + ' ' + fx(F[1]) + ')"><circle r="19" fill="#FFFFFF" fill-opacity=".95" stroke="#2F7BEF" stroke-width="2"/><path d="M-9 -4H8l-4 -4M9 4H-8l4 4" fill="none" stroke="#1B4FA8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><title>اقلب الفرجار يمين / شمال</title></g>' : '');
     }
     function triSvg(id) {
       var P = pose(id), T = s[id], w = P.w, h = P.h, ins = id === 't45' ? 26 : 24;
@@ -550,11 +497,11 @@
       // given + ghost
       var gv = '';
       if (grid) {
-        var G = lgeo(), dn = ldone(), cur = dn.findIndex(function (v) { return !v; });
-        if (s.showHint && cur >= 0) gv += '<path d="' + L().ghost(cur, G, K) + '" fill="none" stroke="#2F7BEF" stroke-width="2" stroke-dasharray="6 6" opacity=".55"/>';
-        if (G.seg) gv += '<line x1="' + fx(G.seg[0][0]) + '" y1="' + fx(G.seg[0][1]) + '" x2="' + fx(G.seg[1][0]) + '" y2="' + fx(G.seg[1][1]) + '" stroke="#C0392B" stroke-width="2.2"/>';
-        G.pts.forEach(function (q) { gv += '<path d="M' + fx(q[0] - 7) + ' ' + fx(q[1] - 7) + 'L' + fx(q[0] + 7) + ' ' + fx(q[1] + 7) + 'M' + fx(q[0] + 7) + ' ' + fx(q[1] - 7) + 'L' + fx(q[0] - 7) + ' ' + fx(q[1] + 7) + '" stroke="#E3141B" stroke-width="1.6"/>'; });
-        G.labels.forEach(function (l) { gv += '<text x="' + fx(l[0][0] + l[2]) + '" y="' + fx(l[0][1] + l[3]) + '" font-size="20" fill="#C0392B" class="kufi">' + l[1] + '</text>'; });
+        var Gs = L(), G = Gs.given, cur = curStep();
+        if (s.showHint && cur >= 0 && !s.demo) gv += '<path d="' + LS.ghost(Gs, cur) + '" fill="none" stroke="#2F7BEF" stroke-width="2.2" stroke-dasharray="6 6" opacity=".6"/>';
+        G.circles.forEach(function (c) { gv += '<path d="' + arcD(c[0][0], c[0][1], c[1] * K, 0, 2 * Math.PI) + '" fill="none" stroke="#1A1D24" stroke-width="2.2"/>'; });
+        G.segs.forEach(function (sg) { gv += '<line x1="' + fx(sg[0][0]) + '" y1="' + fx(sg[0][1]) + '" x2="' + fx(sg[1][0]) + '" y2="' + fx(sg[1][1]) + '" stroke="#1A1D24" stroke-width="2.4" stroke-linecap="round"/>'; });
+        G.pts.forEach(function (q) { var c = q[0]; gv += '<path d="M' + fx(c[0] - 6) + ' ' + fx(c[1] - 6) + 'L' + fx(c[0] + 6) + ' ' + fx(c[1] + 6) + 'M' + fx(c[0] + 6) + ' ' + fx(c[1] - 6) + 'L' + fx(c[0] - 6) + ' ' + fx(c[1] + 6) + '" stroke="#E3141B" stroke-width="1.6"/>'; if (q[1]) gv += '<text x="' + fx(c[0] + (q[2] || 10)) + '" y="' + fx(c[1] + (q[3] || -10)) + '" font-size="22" font-weight="700" fill="#C0392B" class="kufi">' + q[1] + '</text>'; });
       }
       setL('L-given', gv);
       setL('L-strokes', s.strokes.map(strokeSvg).join(''));
@@ -595,8 +542,8 @@
       var h = '';
       if (s.tab === 'pens') {
         h += '<div class="ptitle">لون الخط</div><div class="swatches">' + COLORS.map(function (c) { return '<button type="button" class="swb' + (s.ink === c[0] ? ' on' : '') + '" data-ink="' + c[0] + '" aria-label="' + c[1] + '" title="' + c[1] + '"><span style="background:' + c[2] + '"></span></button>'; }).join('') + '</div>';
-        h += '<div class="ptitle">أقلام الرصاص</div><div class="penlist">' + PENS.map(function (p) { return '<button type="button" class="item' + (s.pencil === p[0] ? ' on' : '') + '" data-pen="' + p[0] + '"><svg class="pensw" viewBox="0 0 104 20"><path d="M2 10L18 4V16Z" fill="#E7C79A"/><path d="M2 10L7 8.1V11.9Z" fill="#2A2A2A"/><rect x="18" y="4" width="78" height="12" rx="1.5" fill="' + p[4] + '"/><rect x="94" y="4" width="8" height="12" rx="1.5" fill="#C9CFD8"/></svg><span class="it-t"><b>' + p[1] + '</b><small>' + p[2] + '</small></span><span class="code">' + p[3] + '</span></button>'; }).join('') + '</div>';
-        h += '<div class="ptitle">نوع الخط <span class="muted">جدول (2-1)</span></div><div class="linelist">' + LTYPES.map(function (l) { return '<button type="button" class="item' + (s.line === l[0] ? ' on' : '') + '" data-line="' + l[0] + '"><span class="it-n">' + l[1] + '</span><svg class="linesw" viewBox="0 0 90 12"><line x1="2" y1="6" x2="88" y2="6" stroke="' + l[4] + '" stroke-width="' + Math.max(1, l[2] * 4) + '"' + (l[3] ? ' stroke-dasharray="' + l[3].split(' ').map(function (n) { return n * 3; }).join(' ') + '"' : '') + '/></svg><span class="code small">' + l[2] + '</span></button>'; }).join('') + '</div>';
+        h += '<div class="ptitle">أقلام الرصاص</div><div class="penlist">' + PENS.map(function (p) { return '<button type="button" class="item' + (s.pencil === p[0] ? ' on' : '') + '" data-pen="' + p[0] + '"><svg class="pensw" viewBox="0 0 104 20"><path d="M2 10L18 4V16Z" fill="#E7C79A"/><path d="M2 10L7 8.1V11.9Z" fill="#2A2A2A"/><rect x="18" y="4" width="78" height="12" rx="1.5" fill="' + p[4] + '"/><rect x="94" y="4" width="8" height="12" rx="1.5" fill="#C9CFD8"/></svg><span class="it-t"><b>' + p[1] + '</b><small>' + p[2] + '</small></span><svg class="thk" viewBox="0 0 54 16" aria-hidden="true"><path d="M3 10C14 4 24 13 36 7S48 6 51 8" fill="none" stroke="' + p[5] + '" stroke-width="' + fx(3.2 * pfOf(p[0])) + '" stroke-linecap="round"/></svg><span class="code">' + p[3] + '</span></button>'; }).join('') + '</div>';
+        h += '<div class="ptitle">نوع الخط <span class="muted">جدول (2-1)</span></div><div class="linelist">' + LTYPES.map(function (l) { return '<button type="button" class="item' + (s.line === l[0] ? ' on' : '') + '" data-line="' + l[0] + '"><span class="it-n">' + l[1] + '</span><svg class="linesw" viewBox="0 0 90 12"><line x1="2" y1="6" x2="88" y2="6" stroke="' + l[4] + '" stroke-width="' + fx(Math.max(0.6, l[2] * 4.4 * pfOf(s.pencil))) + '"' + (l[3] ? ' stroke-dasharray="' + l[3].split(' ').map(function (n) { return n * 3; }).join(' ') + '"' : '') + '/></svg><span class="code small">' + l[2] + '</span></button>'; }).join('') + '</div>';
       } else if (s.tab === 'div') {
         var d = s.dv;
         h += '<div class="ptitle">تقسيم لوحة الرسم ' + (grid ? 'A4' : 'A3') + '</div><div class="grid2">' +
@@ -604,12 +551,22 @@
           '<div class="calc">' + calcHtml() + '</div>' +
           '<button type="button" class="btn primary" data-act="div">ارسم خطوط التقسيم واكتب المقاسات (قلم H)</button>';
       } else if (s.tab === 'steps') {
-        var Ls = L(), dn = ldone(), cur = dn.findIndex(function (v) { return !v; });
-        h += '<div class="seg small lessons">' + LESSONS.map(function (x, i) { return '<button type="button" data-lesson="' + i + '" class="' + (i === s.lesson ? 'on' : '') + '">' + x.short + '</button>'; }).join('') + '</div>';
-        h += '<div class="ptitle">' + Ls.title + '</div><div class="given">' + Ls.given + '</div><div class="steps">' +
-          Ls.steps.map(function (x, i) { var done = dn[i], c = i === cur; return '<div class="step' + (done ? ' done' : '') + (c ? ' cur' : '') + '"><span class="badge">' + (done ? '✓' : i + 1) + '</span><span class="st"><b>' + x[0] + (c && dn.extra ? ' (' + dn.extra + ')' : '') + '</b><small>' + x[1] + '</small></span></div>'; }).join('') + '</div>' +
-          '<div class="row2"><button type="button" class="btn" data-act="hint">' + (s.showHint ? 'إخفاء التلميح' : 'إظهار التلميح') + '</button><button type="button" class="btn primary" data-act="demo">' + (cur < 0 ? 'اكتمل التمرين' : 'ارسم الخطوة ' + (cur + 1) + ' أمامي') + '</button></div>' +
-          '<button type="button" class="btn ghost" data-act="reset">ابدأ التمرين من جديد</button>';
+        var Ls = L(), dn = ldone(), cur = curStep(dn), groups = [];
+        LS.list.forEach(function (x) { if (groups.indexOf(x.group) < 0) groups.push(x.group); });
+        h += '<label class="lab">اختر الإنشاء الهندسي<select class="bin lsel" data-lsel="1">' + groups.map(function (g) { return '<optgroup label="' + g + '">' + LS.list.filter(function (x) { return x.group === g; }).map(function (x) { return '<option value="' + x.i + '"' + (x.i === s.lesson ? ' selected' : '') + '>' + (x.i + 1) + '. ' + x.short + '</option>'; }).join('') + '</optgroup>'; }).join('') + '</select></label>';
+        h += '<div class="lnav"><button type="button" class="chipbtn" data-lnav="-1" aria-label="السابق">→ السابق</button><span class="muted small">' + (s.lesson + 1) + ' / ' + LS.list.length + '</span><button type="button" class="chipbtn" data-lnav="1" aria-label="التالي">التالي ←</button></div>';
+        h += '<div class="ptitle">' + Ls.title + '</div><div class="given">' + Ls.given.text + '</div>';
+        h += '<div class="seg small phases"><button type="button" data-phase="explain" class="' + (s.phase === 'explain' ? 'on' : '') + '">١ · شرح الخطوات</button><button type="button" data-phase="practice" class="' + (s.phase === 'practice' ? 'on' : '') + '">٢ · التنفيذ بيدك</button></div>';
+        if (s.phase === 'explain') {
+          h += '<div class="steps all">' + Ls.steps.map(function (x, i) { var c = s.demo && s.demoAt === i; return '<div class="step' + (c ? ' cur' : '') + (s.demo && s.demoAt > i ? ' done' : '') + '"><span class="badge">' + (i + 1) + '</span><span class="st"><b>' + x.title + '</b><small>' + x.text + '</small></span></div>'; }).join('') + '</div>' +
+            (s.demo ? '<button type="button" class="btn" data-act="stop">إيقاف الشرح</button>' : '<button type="button" class="btn primary" data-act="demoall">▶ شاهد الشرح كاملًا على الورقة</button>') +
+            '<button type="button" class="btn ok" data-act="practice">ابدأ التنفيذ بنفسك ←</button>';
+        } else {
+          h += '<div class="steps">' + Ls.steps.map(function (x, i) { var done = dn[i], c = i === cur; return '<div class="step' + (done ? ' done' : '') + (c ? ' cur' : '') + '"><span class="badge">' + (done ? '✓' : i + 1) + '</span><span class="st"><b>' + x.title + (c && dn.extra ? ' (' + dn.extra + ')' : '') + '</b><small>' + x.text + '</small></span></div>'; }).join('') + '</div>' +
+            (cur < 0 ? '<div class="donebox">ممتاز! أكملت الإنشاء بنجاح ✓</div>' : '') +
+            '<div class="row2"><button type="button" class="btn" data-act="hint">' + (s.showHint ? 'إخفاء التلميح' : 'إظهار التلميح') + '</button><button type="button" class="btn primary" data-act="demo"' + (cur < 0 || s.demo ? ' disabled' : '') + '>' + (cur < 0 ? 'اكتمل التمرين' : 'ارسم الخطوة ' + (cur + 1) + ' أمامي') + '</button></div>' +
+            '<button type="button" class="btn ghost" data-act="reset">ابدأ التمرين من جديد</button>';
+        }
       } else if (s.tab === 'write') {
         h += '<div class="ptitle">الكتابة باليد</div><div class="help">اختر «الكتابة باليد» من الأدوات واكتب بإصبعك أو بالقلم على الورقة: الأبعاد، الحروف، أسماء المساقط — بنفس قلم الرصاص المختار.</div>' +
           '<button type="button" class="btn primary" data-act="hand">ابدأ الكتابة باليد</button>' +
@@ -657,11 +614,20 @@
       if ((a = b.getAttribute('data-chip'))) { sfx.tick(1300, 0.1); set({ text: a, tool: 'text' }); return; }
       if ((a = b.getAttribute('data-tsize'))) { set({ tsize: +a }); return; }
       if (b.hasAttribute('data-pfx')) { setPfx(b.getAttribute('data-pfx')); return; }
-      if ((a = b.getAttribute('data-lesson'))) { var li = +a; if (li !== s.lesson) { sfx.rip(); set({ lesson: li, strokes: [], hist: s.hist.concat([s.strokes]), comp: null, showHint: false }); persist(); } return; }
+      if (b.id === 'bd-reopen') { togglePanels(); return; }
+      if ((a = b.getAttribute('data-lnav'))) { var nl = (s.lesson + +a + LS.list.length) % LS.list.length; pickLesson(nl); return; }
+      if ((a = b.getAttribute('data-phase'))) { if (s.demo) return; sfx.tick(1300, 0.1); if (a === 'practice' && s.phase !== 'practice') { startPractice(); } else set({ phase: a }); persist(); return; }
+      if ((a = b.getAttribute('data-pvm'))) { pvSet({ mi: +a }); return; }
+      if ((a = b.getAttribute('data-pvmode'))) { pvSet({ mode: a, reveal: false }); return; }
       switch (b.getAttribute('data-act') || b.id) {
         case 'div': divDraw(); break;
         case 'hint': sfx.tick(1300, 0.1); set({ showHint: !s.showHint }); break;
-        case 'demo': var dn = ldone(), cur = dn.findIndex(function (v) { return !v; }); if (cur < 0) toast('أكملت كل الخطوات — أحسنت!', 'ok'); else demoStep(cur); break;
+        case 'demo': var cur = curStep(); if (cur < 0) toast('أكملت كل الخطوات — أحسنت!', 'ok'); else runDemo([cur]); break;
+        case 'demoall': if (s.demo) return; sfx.rip(); set({ strokes: [], hist: s.hist.concat([s.strokes]), comp: null, phase: 'explain' }); later(function () { runDemo(L().steps.map(function (_, i) { return i; })); }, 350); break;
+        case 'stop': demoStop = true; break;
+        case 'practice': startPractice(); break;
+        case 'bd-panels': togglePanels(); break;
+        case 'bd-pv': if (s.pv) pvClose(); else pvOpen(); break;
         case 'reset': sfx.rip(); commit([]); set({ comp: null }); break;
         case 'hand': sfx.tick(1500, 0.12); set({ tool: 'hand' }); toast('اكتب بإصبعك أو بالقلم على الورقة', 'info'); break;
         case 'assist': sfx.tick(1200, 0.1); set({ assist: !s.assist }); break;
@@ -671,6 +637,98 @@
         case 'bd-rec': sfx.tick(s.rec ? 700 : 1500, 0.15); set({ rec: !s.rec }); break;
       }
     });
+
+    /* ---------- perspective exercise window (choose a solid, derive views) ---------- */
+    var GEO = window.DLGeo, pvR = null, pvDirty = false, pvRaf = 0, pvDrag = null;
+    var PVMODES = [['3d', 'المجسم والأبعاد'], ['third', 'استنتج المسقط الثالث'], ['iso', 'ارسم المنظور']];
+    function pvDefault() { var v = null; try { v = JSON.parse(localStorage.getItem('dl-pv') || 'null'); } catch (e) {} return Object.assign({ mi: 0, mode: '3d', reveal: false, yaw: 38, pitch: 26, angle: 1, min: false, x: null, y: null }, v || {}, { reveal: false }); }
+    function pvSave() { try { var v = s.pv; localStorage.setItem('dl-pv', JSON.stringify({ mi: v.mi, mode: v.mode, angle: v.angle, x: v.x, y: v.y })); } catch (e) {} }
+    function pvOpen() { sfx.swoosh(0.9, 0.25); sfx.thud(0.3); s.pv = pvDefault(); pvBuild(); el.querySelector('#bd-pv').classList.add('on'); }
+    function pvClose() { sfx.tick(900, 0.1); s.pv = null; cancelAnimationFrame(pvRaf); var w = el.querySelector('#bd-pvwin'); w.hidden = true; w.innerHTML = ''; pvR = null; el.querySelector('#bd-pv').classList.remove('on'); }
+    function pvSet(o) { var re = ('mi' in o && o.mi !== s.pv.mi) || ('mode' in o && o.mode !== s.pv.mode) || ('angle' in o) || ('reveal' in o) || ('min' in o); if ('mi' in o && o.mi !== s.pv.mi) { sfx.thud(0.3); o.reveal = false; } else sfx.tick(1300, 0.1); Object.assign(s.pv, o); pvSave(); if (re) pvBuild(); else { pvDirty = true; } }
+    function pvStars(n) { return '<span class="stars">' + '★★★★★'.slice(0, n) + '<span class="st-off">' + '★★★★★'.slice(0, 5 - n) + '</span></span>'; }
+    function pvBuild() {
+      var v = s.pv, w = el.querySelector('#bd-pvwin'), m = GEO.MODELS[v.mi]; if (!m) { v.mi = 0; m = GEO.MODELS[0]; }
+      w.hidden = false; w.classList.toggle('min', !!v.min);
+      var show3d = v.mode === '3d' || (v.mode === 'iso' && v.reveal);
+      var head = '<div class="pv-h" data-pvdrag="1"><span class="pv-grip" aria-hidden="true">⋮⋮</span><b>' + esc(m.name) + '</b><span class="mono muted">' + m.dims + ' مم</span>' + pvStars(m.stars) +
+        '<span class="sp"></span><button type="button" class="pv-x" data-pvact="min" aria-label="' + (v.min ? 'تكبير النافذة' : 'تصغير النافذة') + '">' + (v.min ? '▢' : '—') + '</button><button type="button" class="pv-x" data-pvact="close" aria-label="إغلاق">✕</button></div>';
+      if (v.min) { w.innerHTML = head; pvPlace(); return; }
+      var hint = v.mode === '3d' ? 'اسحب المجسم لتدويره وتأمّله من كل الجهات، ثم استخرج المساقط الثلاثة وارسمها على اللوحة بالأبعاد المكتوبة.' :
+        v.mode === 'third' ? 'معطى المسقطان الأمامي والأفقي بالأبعاد. استنتج المسقط الجانبي وارسمه على اللوحة، ثم اضغط «إظهار الحل» للمقارنة.' :
+        'معطاة المساقط الثلاثة بالأبعاد. ارسم المنظور الأيزومتري للمجسم على اللوحة، ثم اضغط «إظهار المجسم» للتحقق.';
+      w.innerHTML = head +
+        '<div class="pv-models">' + GEO.MODELS.map(function (x, i) { return '<button type="button" class="pv-m' + (i === v.mi ? ' on' : '') + '" data-pvm="' + i + '">' + esc(x.short) + '<small>' + '★★★★★'.slice(0, x.stars) + '</small></button>'; }).join('') + '</div>' +
+        '<div class="seg small pv-modes">' + PVMODES.map(function (x) { return '<button type="button" data-pvmode="' + x[0] + '" class="' + (v.mode === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+        '<div class="pv-stage">' + (show3d ? '<canvas class="pv-cv" id="bd-pvcv" aria-label="المجسم — اسحب للتدوير"></canvas><span class="pv-tag">' + GEO.viewName(v.yaw, v.pitch) + '</span>' : '<svg class="pv-sheet" viewBox="0 0 460 380" role="img" aria-label="المساقط">' + pvSheet() + '</svg>') + '</div>' +
+        '<div class="pv-help">' + hint + '</div>' +
+        '<div class="pv-f">' +
+          (show3d ? '<button type="button" class="chipbtn" data-pvact="iso">أيزومتري</button><button type="button" class="chipbtn" data-pvact="front">أمامي</button><button type="button" class="chipbtn" data-pvact="top">علوي</button><button type="button" class="chipbtn" data-pvact="side">جانبي</button>' : '<div class="seg small"><button type="button" data-pvact="a1" class="' + (v.angle === 1 ? 'on' : '') + '">الزاوية الأولى</button><button type="button" data-pvact="a3" class="' + (v.angle === 3 ? 'on' : '') + '">الثالثة</button></div>') +
+          (v.mode === 'third' ? '<button type="button" class="btn ' + (v.reveal ? '' : 'primary') + ' pv-rev" data-pvact="reveal">' + (v.reveal ? 'إخفاء الحل' : 'إظهار الحل') + '</button>' : '') +
+          (v.mode === 'iso' ? '<button type="button" class="btn ' + (v.reveal ? '' : 'primary') + ' pv-rev" data-pvact="reveal">' + (v.reveal ? 'العودة للمساقط' : 'إظهار المجسم') + '</button>' : '') +
+        '</div>';
+      pvPlace();
+      var cv = w.querySelector('#bd-pvcv'); pvR = cv ? new GEO.Renderer(cv) : null; pvDirty = true; cancelAnimationFrame(pvRaf); if (pvR) pvLoop();
+      if (cv) pvBindCanvas(cv);
+    }
+    function pvSheet() {
+      var v = s.pv, m = GEO.MODELS[v.mi], hide = v.mode === 'third' && !v.reveal ? 'side' : '', S = GEO.sheet(m, v.angle, 460, 380, { dims: true, hide: hide }), first = v.angle === 1;
+      return '<rect x="4" y="4" width="452" height="372" fill="#FBFCFE" stroke="#1A1A1A" stroke-width="1.2"/>' +
+        (hide ? '' : '<path d="' + S.cons + '" fill="none" stroke="#B9C7DC" stroke-width=".7"/><path d="' + S.miter + '" fill="none" stroke="#E3141B" stroke-width=".9"/>') +
+        '<path d="' + S.hid + '" fill="none" stroke="#3A4452" stroke-width=".95" stroke-dasharray="4.5 2.5"/><path d="' + S.vis + '" fill="none" stroke="#0E1116" stroke-width="1.8" stroke-linecap="round"/>' +
+        '<path d="' + S.dimLines + '" fill="none" stroke="#1F6FEB" stroke-width=".75"/><path d="' + S.dimArrows + '" fill="#1F6FEB"/>' +
+        S.dimText.map(function (t) { return '<text x="' + fx(t.x) + '" y="' + fx(t.y) + '" text-anchor="middle" font-size="12" fill="#1F4FA8" class="mono"' + (t.r ? ' transform="rotate(' + t.r + ' ' + fx(t.x) + ' ' + fx(t.y) + ')"' : '') + '>' + t.t + '</text>'; }).join('') +
+        S.labels.map(function (l) { return '<text x="' + l.x + '" y="' + l.y + '" text-anchor="middle" font-size="12.5" fill="' + (l.t.indexOf('؟') >= 0 ? '#C0392B' : '#33476B') + '"' + (l.t.indexOf('؟') >= 0 ? ' font-weight="700"' : '') + '>' + l.t + '</text>'; }).join('') +
+        (v.mode === 'iso' ? '' : '<g transform="translate(372 352)" stroke="#111" stroke-width="1.1" fill="none">' + (first ? '<path d="M0 -6L30 -13V13L0 6Z"/><circle cx="56" cy="0" r="13"/><circle cx="56" cy="0" r="5.5"/>' : '<circle cx="13" cy="0" r="13"/><circle cx="13" cy="0" r="5.5"/><path d="M40 -6L70 -13V13L40 6Z"/>') + '</g>');
+    }
+    function pvPlace() {
+      var w = el.querySelector('#bd-pvwin'), host = w.parentNode, v = s.pv; if (!v) return;
+      var hw = host.clientWidth, hh = host.clientHeight, ww = w.offsetWidth || 420, wh = w.offsetHeight || 300;
+      if (v.x === null || v.y === null) { v.x = 14; v.y = 14; }
+      v.x = Math.max(4, Math.min(hw - ww - 4, v.x)); v.y = Math.max(4, Math.min(Math.max(4, hh - wh - 4), v.y));
+      w.style.left = v.x + 'px'; w.style.top = v.y + 'px';
+    }
+    function pvLoop() {
+      if (!alive || !s.pv || !pvR) return; pvRaf = requestAnimationFrame(pvLoop);
+      if (!pvDirty) return; pvDirty = false; var v = s.pv;
+      try { pvR.draw({ model: GEO.MODELS[v.mi], yaw: v.yaw, pitch: v.pitch, e: 0, u: 0, box: false, mode: 'real', hidden: false, zoom: 0.92, sel: -1, dims: true, noArrow: true, fast: !!pvDrag }); } catch (err) { console.error(err); }
+      var tg = el.querySelector('.pv-tag'); if (tg) tg.textContent = GEO.viewName(v.yaw, v.pitch);
+    }
+    function pvTween(yaw, pitch) {
+      var v = s.pv, y0 = v.yaw, p0 = v.pitch, t0 = performance.now(); sfx.swoosh(0.7, 0.25);
+      var dy = ((yaw - y0) % 360 + 540) % 360 - 180;
+      (function st(t) { if (!s.pv) return; var k = Math.min(1, (t - t0) / 800), e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; v.yaw = y0 + dy * e; v.pitch = p0 + (pitch - p0) * e; pvDirty = true; if (k < 1) requestAnimationFrame(st); })(t0);
+    }
+    function pvBindCanvas(cv) {
+      var d = null;
+      cv.addEventListener('pointerdown', function (e) { e.stopPropagation(); try { cv.setPointerCapture(e.pointerId); } catch (x) {} d = { x: e.clientX, y: e.clientY, yaw: s.pv.yaw, pitch: s.pv.pitch, lx: e.clientX, ly: e.clientY }; pvDrag = d; });
+      cv.addEventListener('pointermove', function (e) { if (!d) return; var sp = Math.hypot(e.clientX - d.lx, e.clientY - d.ly); d.lx = e.clientX; d.ly = e.clientY; sfx.play('whoosh', Math.min(1, sp / 18)); s.pv.yaw = d.yaw - (e.clientX - d.x) * 0.45; s.pv.pitch = Math.max(-10, Math.min(90, d.pitch + (e.clientY - d.y) * 0.36)); pvDirty = true; });
+      function end() { d = null; pvDrag = null; pvDirty = true; }
+      cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+    }
+    (function () {
+      var w = el.querySelector('#bd-pvwin');
+      w.addEventListener('pointerdown', function (e) {
+        var h = e.target.closest('[data-pvdrag]'); if (!h || e.target.closest('button')) return;
+        try { h.setPointerCapture(e.pointerId); } catch (x) {} pvDrag = { wx: e.clientX - s.pv.x, wy: e.clientY - s.pv.y, h: h };
+      });
+      w.addEventListener('pointermove', function (e) { if (!pvDrag || !pvDrag.h) return; s.pv.x = e.clientX - pvDrag.wx; s.pv.y = e.clientY - pvDrag.wy; pvPlace(); });
+      function endW() { if (pvDrag && pvDrag.h) { pvDrag = null; pvSave(); } }
+      w.addEventListener('pointerup', endW); w.addEventListener('pointercancel', endW);
+      w.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-pvact]'); if (!b) return; e.stopPropagation(); var a = b.getAttribute('data-pvact');
+        if (a === 'close') pvClose(); else if (a === 'min') pvSet({ min: !s.pv.min });
+        else if (a === 'reveal') { sfx.chime(); pvSet({ reveal: !s.pv.reveal }); }
+        else if (a === 'a1' || a === 'a3') pvSet({ angle: a === 'a1' ? 1 : 3 });
+        else if (a === 'iso') pvTween(45, 35.26); else if (a === 'front') pvTween(0, 0); else if (a === 'top') pvTween(0, 90); else if (a === 'side') pvTween(s.pv.angle === 3 ? -90 : 90, 0);
+      });
+      window.addEventListener('resize', function () { if (s.pv) { pvPlace(); pvDirty = true; } });
+    })();
+    function pickLesson(li) { if (s.demo || li === s.lesson) return; sfx.rip(); set({ lesson: li, strokes: [], hist: s.hist.concat([s.strokes]), comp: null, showHint: false, phase: 'explain' }); persist(); }
+    function startPractice() { if (s.demo) return; sfx.rip(); set({ phase: 'practice', strokes: [], hist: s.hist.concat([s.strokes]), comp: null, showHint: false }); persist(); toast('طبّق الخطوة 1: ' + L().steps[0].title, 'info'); }
+    function togglePanels() { sfx.tick(1200, 0.1); s.panels = !s.panels; try { localStorage.setItem('dl-panels', s.panels ? '1' : '0'); } catch (e) {} applyPanels(); }
+    function applyPanels() { var bd = el.querySelector('.body'); bd.classList.toggle('collapsed', !s.panels); var t = el.querySelector('#bd-panels'); if (t) { t.classList.toggle('on', !s.panels); t.setAttribute('aria-pressed', String(!s.panels)); } }
+    el.addEventListener('change', function (ev) { var t = ev.target; if (t.getAttribute && t.getAttribute('data-lsel')) { pickLesson(+t.value); t.blur(); } });
     el.addEventListener('input', function (ev) {
       var t = ev.target, k;
       if ((k = t.getAttribute('data-dv'))) { var dv = Object.assign({}, s.dv); dv[k] = t.value; s.dv = dv; var calc = el.querySelector('#bd-panel .calc'); if (calc) calc.innerHTML = calcHtml(); }
@@ -681,8 +739,8 @@
     svg.addEventListener('pointerup', up);
     svg.addEventListener('pointercancel', up);
     svg.addEventListener('pointerleave', function () { if (!drag && s.hover) set({ hover: null }); });
-    render();
-    return function () { alive = false; timers.forEach(clearTimeout); cancelAnimationFrame(raf); };
+    render(); applyPanels();
+    return function () { alive = false; cancelAnimationFrame(pvRaf); timers.forEach(clearTimeout); cancelAnimationFrame(raf); };
   }
   window.DLScreens = window.DLScreens || {};
   window.DLScreens.board = function (el) { return mountBoard(el, 'board'); };
